@@ -193,6 +193,156 @@ export default function Dashboard() {
     }
   }
 
+  const startFullProjectScan = async (projectId: string, projectName: string) => {
+    try {
+      console.log(`Starting full AI scan for project: ${projectName}`)
+      
+      // Add to scanning set
+      setScanningProjects(prev => new Set(prev).add(projectId))
+      
+      // Get all tracking items for this project
+      const trackingItems = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        .filter((item: any) => item.projectId === projectId)
+      
+      if (trackingItems.length === 0) {
+        toast.info('No topics to scan. Add some keywords and topics first.')
+        setScanningProjects(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(projectId)
+          return newSet
+        })
+        return
+      }
+      
+      const project = projects.find(p => p.id === projectId)
+      if (!project) {
+        throw new Error('Project not found')
+      }
+      
+      let totalMentions = 0
+      const platforms = ['chatgpt', 'perplexity', 'gemini']
+      
+      // Scan each topic for this project
+      for (const trackingItem of trackingItems) {
+        console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
+        
+        for (const platform of platforms) {
+          try {
+            // Simulate AI query for brand position
+            await new Promise(resolve => setTimeout(resolve, 800))
+            
+            // Simulate finding brand mention (70% chance)
+            const hasMention = Math.random() > 0.3
+            let position = null
+            let mentionType = 'neutral'
+            
+            if (hasMention) {
+              position = Math.floor(Math.random() * 5) + 1
+              mentionType = Math.random() > 0.7 ? 'positive' : 'neutral'
+              totalMentions++
+              
+              // Create mention result
+              const mentionResult = {
+                id: Date.now().toString() + Math.random(),
+                projectId,
+                projectName: project.name,
+                brandName: project.brandName,
+                keyword: trackingItem.keyword,
+                topic: trackingItem.topic,
+                aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
+                hasMention: true,
+                mentionType,
+                detectedAt: new Date().toISOString(),
+                source: platform,
+                content: `Found mention of ${project.brandName} in ${platform} response about "${trackingItem.topic}"`,
+                position,
+                platform
+              }
+              
+              // Add to mention results
+              setMentionResults(prev => [mentionResult, ...prev])
+              
+              // Update localStorage
+              const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+              const updatedResults = [mentionResult, ...existingResults]
+              localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+              
+              // Simulate getting source URLs
+              await new Promise(resolve => setTimeout(resolve, 500))
+              
+              // Create simulated source URLs
+              const sourceUrls = [
+                {
+                  id: `source-${Date.now()}-${Math.random()}`,
+                  url: `https://example.com/source-${platform}-${trackingItem.keyword}`,
+                  domain: 'example.com',
+                  title: `Source from ${platform} for ${trackingItem.topic}`,
+                  date: new Date().toISOString(),
+                  keyword: trackingItem.keyword,
+                  platform
+                }
+              ]
+              
+              // Add to data sources
+              setDataSources(prev => [...sourceUrls, ...prev])
+              
+            } else {
+              // No mention found
+              const noMentionResult = {
+                id: Date.now().toString() + Math.random(),
+                projectId,
+                projectName: project.name,
+                brandName: project.brandName,
+                keyword: trackingItem.keyword,
+                topic: trackingItem.topic,
+                aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
+                hasMention: false,
+                mentionType: 'neutral',
+                detectedAt: new Date().toISOString(),
+                source: platform,
+                content: `No mention of ${project.brandName} found in ${platform} response`,
+                position: null,
+                platform
+              }
+              
+              // Add to mention results (for tracking purposes)
+              setMentionResults(prev => [noMentionResult, ...prev])
+              
+              // Update localStorage
+              const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+              const updatedResults = [noMentionResult, ...existingResults]
+              localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+            }
+            
+          } catch (error) {
+            console.error(`Error scanning ${platform} for topic ${trackingItem.topic}:`, error)
+          }
+        }
+      }
+      
+      // Show completion message
+      if (totalMentions > 0) {
+        toast.success(`AI scan completed! Found ${totalMentions} brand mentions across all platforms`)
+      } else {
+        toast.info('AI scan completed. No brand mentions found this time.')
+      }
+      
+      // Refresh data sources
+      setTimeout(fetchDataSources, 1000)
+      
+    } catch (error) {
+      console.error('Error starting full project scan:', error)
+      toast.error(`Failed to start scan for ${projectName}`)
+    } finally {
+      // Remove from scanning set
+      setScanningProjects(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(projectId)
+        return newSet
+      })
+    }
+  }
+
   const loadMentionResults = () => {
     try {
       const results = JSON.parse(localStorage.getItem('mentionResults') || '[]')
@@ -1336,6 +1486,27 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
+                    <Button 
+                      size="sm"
+                      onClick={() => startFullProjectScan(projectId, projectData.projectName)}
+                      disabled={scanningProjects.has(projectId)}
+                      className={scanningProjects.has(projectId) ? 
+                        "bg-red-600 hover:bg-red-700 text-white" : 
+                        "bg-green-600 hover:bg-green-700 text-white"
+                      }
+                    >
+                      {scanningProjects.has(projectId) ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Run Scan
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -1395,41 +1566,7 @@ export default function Dashboard() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="default">Active</Badge>
-                                {/* Toggle Run Scan / Stop button */}
-                                <Button 
-                                  size="sm" 
-                                  className={scanningProjects.has(projectId) ? 
-                                    "bg-green-600 hover:bg-green-700 text-white" : 
-                                    "bg-red-600 hover:bg-red-700 text-white"
-                                  }
-                                  onClick={() => {
-                                    const newScanning = new Set(scanningProjects)
-                                    if (scanningProjects.has(projectId)) {
-                                      // Stop scanning
-                                      newScanning.delete(projectId)
-                                      toast.info(`Stopped scanning for ${projectData.projectName}`)
-                                    } else {
-                                      // Start scanning
-                                      newScanning.add(projectId)
-                                      toast.success(`Starting scan for ${projectData.projectName}...`)
-                                      // Call AI scanning API
-                                      startProjectScan(projectId, projectData.projectName)
-                                    }
-                                    setScanningProjects(newScanning)
-                                  }}
-                                >
-                                  {scanningProjects.has(projectId) ? (
-                                    <>
-                                      <XCircle className="w-4 h-4 mr-1" />
-                                      Stop
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Zap className="w-4 h-4 mr-1" />
-                                      Run Scan
-                                    </>
-                                  )}
-                                </Button>
+
                                 <Button variant="outline" size="sm">
                                   <Settings className="w-4 h-4" />
                                 </Button>
@@ -1485,7 +1622,25 @@ export default function Dashboard() {
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                       <span className="text-muted-foreground">Change:</span>
-                                                      <span className="font-medium text-green-600">↑2</span>
+                                                      <span className="font-medium text-green-600">
+                                                        {(() => {
+                                                          const projectMentions = mentionResults.filter(m => 
+                                                            m.projectId === projectId && 
+                                                            m.topic === topic.topic && 
+                                                            m.hasMention
+                                                          )
+                                                          if (projectMentions.length > 1) {
+                                                            const recentMentions = projectMentions
+                                                              .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
+                                                              .slice(0, 2)
+                                                            if (recentMentions.length === 2) {
+                                                              const change = recentMentions[0].position - recentMentions[1].position
+                                                              return change > 0 ? `↓${Math.abs(change)}` : change < 0 ? `↑${Math.abs(change)}` : '→0'
+                                                            }
+                                                          }
+                                                          return '→0'
+                                                        })()}
+                                                      </span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                       <span className="text-muted-foreground">ChatGPT:</span>
@@ -1511,7 +1666,7 @@ export default function Dashboard() {
                                                             m.hasMention && 
                                                             m.source === 'perplexity'
                                                           )
-                                                          return perplexityMentions.length > 0 ? `#${Math.round(Math.random() * 3) + 1}` : '-'
+                                                          return perplexityMentions.length > 0 ? `#${perplexityMentions[0].position || 1}` : '-'
                                                         })()}
                                                       </span>
                                                     </div>
@@ -1525,7 +1680,7 @@ export default function Dashboard() {
                                                             m.hasMention && 
                                                             m.source === 'gemini'
                                                           )
-                                                          return geminiMentions.length > 0 ? `#${Math.round(Math.random() * 3) + 1}` : '-'
+                                                          return geminiMentions.length > 0 ? `#${geminiMentions[0].position || 1}` : '-'
                                                         })()}
                                                       </span>
                                                     </div>
@@ -1791,6 +1946,9 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
                               {source.keyword || 'General'}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {source.platform || 'AI'}
                             </Badge>
                           </div>
                         </div>
