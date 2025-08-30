@@ -1,0 +1,300 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // For email/password authentication
+  subscriptionTier String  @default("free") // free, explorer, starter, pro, agency
+  stripeCustomerId String? @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts     Account[]
+  sessions     Session[]
+  aiKeywords   AIKeyword[]
+  topics       Topic[]
+  usageLogs    UsageLog[]
+  subscriptions Subscription[]
+  brandTracking BrandTracking[]
+  keywordTracking KeywordTracking[]
+  scanResults  ScanResult[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model AIKeyword {
+  id          String   @id @default(cuid())
+  userId      String
+  keyword     String
+  searchVolume Int?
+  trendData   Json?    // Monthly trend data
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiQueries   AIQuery[]
+
+  @@unique([userId, keyword])
+  @@map("ai_keywords")
+}
+
+model AIQuery {
+  id                    String   @id @default(cuid())
+  keywordId             String
+  question              String
+  queryVolume           String?  // High, Medium, Low
+  mentionOpportunityScore Int    // 1-10 score
+  createdAt             DateTime @default(now())
+
+  // Relations
+  keyword               AIKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@map("ai_queries")
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  userId    String
+  topicName String
+  brandName String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandMentions BrandMention[]
+
+  @@unique([userId, topicName, brandName])
+  @@map("topics")
+}
+
+model BrandMention {
+  id           String   @id @default(cuid())
+  topicId      String
+  brandName    String
+  mentionDate  DateTime
+  source       String?  // ChatGPT, Claude, etc.
+  responseText String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  // Relations
+  topic        Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("brand_mentions")
+}
+
+model UsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  actionType String   // ai_keyword_research, report_generation, content_brief
+  usageCount Int      @default(1)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("usage_logs")
+}
+
+model Subscription {
+  id                    String   @id @default(cuid())
+  userId                String
+  stripeSubscriptionId   String?  @unique
+  planType              String   // explorer, starter, pro, agency
+  status                String   // active, canceled, past_due
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  trialEnd              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// New models for enhanced mention tracking
+
+model BrandTracking {
+  id              String   @id @default(cuid())
+  userId          String
+  brandName       String   // The brand being tracked
+  displayName     String   // Display version of brand name
+  website         String?  // Brand website
+  description     String?  // Brand description
+  keywords        String[] // Keywords to track for this brand
+  competitors     String[] // Competitor brands
+  isActive        Boolean  @default(true)
+  scanningEnabled Boolean  @default(true) // Can be paused by user
+  lastScanAt      DateTime?
+  nextScanAt      DateTime?
+  scanInterval    Int      @default(24) // Hours between scans
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keywordTracking KeywordTracking[]
+  scanResults     ScanResult[]
+
+  @@unique([userId, brandName])
+  @@index([userId, isActive])
+  @@index([nextScanAt, scanningEnabled])
+  @@map("brand_tracking")
+}
+
+model KeywordTracking {
+  id              String   @id @default(cuid())
+  userId          String
+  brandTrackingId String
+  keyword         String   // The specific keyword/topic
+  topic           String   // The full topic/question being asked
+  isActive        Boolean  @default(true)
+  
+  // Position metrics
+  avgPosition     Float?   // Average position across all platforms
+  chatgptPosition Int?     // Position in ChatGPT results (1-10, null if not mentioned)
+  perplexityPosition Int?  // Position in Perplexity results
+  geminiPosition  Int?     // Position in Gemini results
+  
+  // Change tracking
+  previousAvgPosition Float?
+  positionChange   Float?   // Positive = improved, negative = worse
+  
+  // Scanning metadata
+  lastScanAt      DateTime?
+  scanCount       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandTracking   BrandTracking @relation(fields: [brandTrackingId], references: [id], onDelete: Cascade)
+  scanResults     ScanResult[]
+
+  @@unique([brandTrackingId, keyword])
+  @@index([userId, isActive])
+  @@index([lastScanAt])
+  @@map("keyword_tracking")
+}
+
+model ScanResult {
+  id              String   @id @default(cuid())
+  userId          String
+  brandTrackingId String
+  keywordTrackingId String
+  
+  // AI Platform info
+  platform        String   // 'chatgpt', 'perplexity', 'gemini'
+  query           String   // The exact query sent to AI
+  
+  // Results
+  brandMentioned  Boolean  @default(false)
+  position        Int?     // Position in results (1-10, null if not mentioned)
+  responseText    String?  @db.Text // Full AI response
+  brandContext    String?  @db.Text // Context around brand mention
+  
+  // Source URLs and metadata
+  sourceUrls      Json?    // Array of {url, domain, title, date} objects
+  confidence      Float?   // Confidence score for mention detection (0-1)
+  
+  // Timing
+  scanDuration    Int?     // Milliseconds taken for this scan
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandTracking   BrandTracking    @relation(fields: [brandTrackingId], references: [id], onDelete: Cascade)
+  keywordTracking KeywordTracking  @relation(fields: [keywordTrackingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, brandTrackingId])
+  @@index([keywordTrackingId, platform])
+  @@index([createdAt])
+  @@map("scan_results")
+}
+
+model ScanQueue {
+  id              String   @id @default(cuid())
+  userId          String
+  brandTrackingId String
+  keywordTrackingId String?
+  
+  // Queue management
+  status          String   @default("pending") // pending, running, completed, failed
+  priority        Int      @default(5) // 1-10, higher = more priority
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // Error handling
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(3)
+  lastError       String?  @db.Text
+  
+  // Metadata
+  scanType        String   // 'manual', 'scheduled', 'auto'
+  metadata        Json?    // Additional scan parameters
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([userId])
+  @@map("scan_queue")
+}

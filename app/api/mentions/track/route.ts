@@ -1,0 +1,248 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { prisma } from '@/lib/prisma'
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession()
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { brandName, keywords, competitors } = await request.json()
+    
+    if (!brandName || !keywords || !Array.isArray(keywords)) {
+      return NextResponse.json({ error: 'Brand name and keywords are required' }, { status: 400 })
+    }
+
+    // Check if database is available
+    let isDatabaseAvailable = false
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      isDatabaseAvailable = true
+    } catch (error) {
+      console.log('Database not available, running in demo mode')
+    }
+
+    if (!isDatabaseAvailable) {
+      // Return demo data for testing
+      return NextResponse.json({
+        success: true,
+        demoMode: true,
+        tracking: {
+          brandName,
+          keywords,
+          competitors: competitors || [],
+          status: 'active',
+          mentions: generateDemoMentions(brandName, keywords),
+          sentiment: {
+            positive: Math.floor(Math.random() * 60) + 20,
+            neutral: Math.floor(Math.random() * 30) + 10,
+            negative: Math.floor(Math.random() * 20) + 5
+          }
+        }
+      })
+    }
+
+    // Create or update brand tracking
+    const tracking = await prisma.brandTracking.upsert({
+      where: { 
+        userId_brandName: {
+          userId: session.user.id,
+          brandName: brandName.toLowerCase()
+        }
+      },
+      update: {
+        keywords,
+        competitors: competitors || [],
+        isActive: true,
+        updatedAt: new Date()
+      },
+      create: {
+        userId: session.user.id,
+        brandName: brandName.toLowerCase(),
+        displayName: brandName,
+        keywords,
+        competitors: competitors || [],
+        isActive: true
+      }
+    })
+
+    // Create tracking keywords
+    for (const keyword of keywords) {
+      await prisma.trackingKeyword.upsert({
+        where: {
+          trackingId_keyword: {
+            trackingId: tracking.id,
+            keyword: keyword.toLowerCase()
+          }
+        },
+        update: {},
+        create: {
+          trackingId: tracking.id,
+          keyword: keyword.toLowerCase(),
+          isActive: true
+        }
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      tracking: {
+        id: tracking.id,
+        brandName: tracking.displayName,
+        keywords: tracking.keywords,
+        competitors: tracking.competitors,
+        status: tracking.isActive ? 'active' : 'inactive',
+        createdAt: tracking.createdAt,
+        updatedAt: tracking.updatedAt
+      }
+    })
+
+  } catch (error) {
+    console.error('Brand tracking error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to set up brand tracking' 
+    }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession()
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const brandName = searchParams.get('brand')
+
+    // Check if database is available
+    let isDatabaseAvailable = false
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      isDatabaseAvailable = true
+    } catch (error) {
+      console.log('Database not available, running in demo mode')
+    }
+
+    if (!isDatabaseAvailable) {
+      // Return demo data
+      return NextResponse.json({
+        tracking: brandName ? generateDemoTracking(brandName) : generateDemoTrackingList(),
+        demoMode: true
+      })
+    }
+
+    if (brandName) {
+      // Get specific brand tracking
+      const tracking = await prisma.brandTracking.findFirst({
+        where: {
+          userId: session.user.id,
+          brandName: brandName.toLowerCase()
+        },
+        include: {
+          keywords: true,
+          mentions: {
+            orderBy: { createdAt: 'desc' },
+            take: 50
+          }
+        }
+      })
+
+      if (!tracking) {
+        return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
+      }
+
+      return NextResponse.json({ tracking })
+    } else {
+      // Get all brand tracking for user
+      const tracking = await prisma.brandTracking.findMany({
+        where: { userId: session.user.id },
+        include: {
+          keywords: true,
+          _count: {
+            select: { mentions: true }
+          }
+        },
+        orderBy: { updatedAt: 'desc' }
+      })
+
+      return NextResponse.json({ tracking })
+    }
+
+  } catch (error) {
+    console.error('Get tracking error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to get brand tracking' 
+    }, { status: 500 })
+  }
+}
+
+function generateDemoMentions(brandName: string, keywords: string[]) {
+  const mentions = []
+  const sources = ['ChatGPT', 'Claude', 'Gemini', 'Bard']
+  const sentiments = ['positive', 'neutral', 'negative']
+  
+  for (let i = 0; i < Math.floor(Math.random() * 10) + 5; i++) {
+    const keyword = keywords[Math.floor(Math.random() * keywords.length)]
+    mentions.push({
+      id: `demo-${i}`,
+      keyword,
+      brandName,
+      sentiment: sentiments[Math.floor(Math.random() * sentiments.length)],
+      source: sources[Math.floor(Math.random() * sources.length)],
+      responseText: `This is a demo mention of ${brandName} in relation to ${keyword}.`,
+      confidence: Math.random() * 0.3 + 0.7,
+      createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
+    })
+  }
+  
+  return mentions
+}
+
+function generateDemoTracking(brandName: string) {
+  return {
+    id: 'demo-tracking',
+    brandName: brandName.toLowerCase(),
+    displayName: brandName,
+    keywords: ['ai marketing', 'automation', 'digital transformation'],
+    competitors: ['Competitor A', 'Competitor B'],
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    keywords: [
+      { keyword: 'ai marketing', isActive: true },
+      { keyword: 'automation', isActive: true },
+      { keyword: 'digital transformation', isActive: true }
+    ],
+    mentions: generateDemoMentions(brandName, ['ai marketing', 'automation', 'digital transformation'])
+  }
+}
+
+function generateDemoTrackingList() {
+  return [
+    {
+      id: 'demo-1',
+      brandName: 'techcorp',
+      displayName: 'TechCorp',
+      keywords: [{ keyword: 'ai marketing', isActive: true }],
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      _count: { mentions: 15 }
+    },
+    {
+      id: 'demo-2',
+      brandName: 'innovateai',
+      displayName: 'InnovateAI',
+      keywords: [{ keyword: 'automation', isActive: true }],
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      _count: { mentions: 8 }
+    }
+  ]
+}

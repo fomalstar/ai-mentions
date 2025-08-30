@@ -1,0 +1,180 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { aiScanningService } from '@/lib/ai-scanning'
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { brandTrackingId, keywordTrackingId, immediate = false } = await request.json()
+    
+    if (!brandTrackingId) {
+      return NextResponse.json({ error: 'Brand tracking ID is required' }, { status: 400 })
+    }
+
+    // Get brand tracking details
+    const brandTracking = await prisma.brandTracking.findFirst({
+      where: {
+        id: brandTrackingId,
+        userId: session.user.id
+      },
+      include: {
+        keywordTracking: {
+          where: keywordTrackingId ? { id: keywordTrackingId } : { isActive: true }
+        }
+      }
+    })
+
+    if (!brandTracking) {
+      return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
+    }
+
+    if (immediate) {
+      // Start immediate scan
+      const results = []
+      
+      for (const keyword of brandTracking.keywordTracking) {
+        try {
+          const scanResults = await aiScanningService.scanKeyword({
+            userId: session.user.id,
+            brandTrackingId: brandTracking.id,
+            keywordTrackingId: keyword.id,
+            brandName: brandTracking.displayName,
+            keyword: keyword.keyword,
+            topic: keyword.topic
+          })
+          
+          results.push({
+            keywordTrackingId: keyword.id,
+            keyword: keyword.keyword,
+            results: scanResults
+          })
+        } catch (error) {
+          console.error(`Scan error for keyword ${keyword.keyword}:`, error)
+          results.push({
+            keywordTrackingId: keyword.id,
+            keyword: keyword.keyword,
+            error: 'Scan failed'
+          })
+        }
+      }
+
+      // Update brand tracking last scan time
+      await prisma.brandTracking.update({
+        where: { id: brandTracking.id },
+        data: { lastScanAt: new Date() }
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Immediate scan completed',
+        results
+      })
+    } else {
+      // Schedule scan in queue
+      const keywords = keywordTrackingId 
+        ? brandTracking.keywordTracking.filter(k => k.id === keywordTrackingId)
+        : brandTracking.keywordTracking
+
+      const queueItems = []
+      
+      for (const keyword of keywords) {
+        const queueItem = await prisma.scanQueue.create({
+          data: {
+            userId: session.user.id,
+            brandTrackingId: brandTracking.id,
+            keywordTrackingId: keyword.id,
+            scheduledAt: new Date(),
+            scanType: 'manual',
+            metadata: {
+              brandName: brandTracking.displayName,
+              keyword: keyword.keyword,
+              topic: keyword.topic
+            }
+          }
+        })
+        queueItems.push(queueItem)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Scan scheduled successfully',
+        queueItems: queueItems.length,
+        scheduledAt: new Date().toISOString()
+      })
+    }
+
+  } catch (error) {
+    console.error('Scan API error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to start scan',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const brandTrackingId = searchParams.get('brandTrackingId')
+
+    // Get recent scan results
+    const where: any = { userId: session.user.id }
+    if (brandTrackingId) {
+      where.brandTrackingId = brandTrackingId
+    }
+
+    const recentScans = await prisma.scanResult.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        keywordTracking: {
+          select: { keyword: true, topic: true }
+        },
+        brandTracking: {
+          select: { displayName: true }
+        }
+      }
+    })
+
+    // Get scan queue status
+    const queueStatus = await prisma.scanQueue.findMany({
+      where: {
+        userId: session.user.id,
+        status: { in: ['pending', 'running'] }
+      },
+      orderBy: { scheduledAt: 'asc' },
+      take: 20
+    })
+
+    return NextResponse.json({
+      recentScans,
+      queueStatus,
+      summary: {
+        totalScans: recentScans.length,
+        pendingInQueue: queueStatus.filter(q => q.status === 'pending').length,
+        currentlyRunning: queueStatus.filter(q => q.status === 'running').length
+      }
+    })
+
+  } catch (error) {
+    console.error('Get scan data error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to get scan data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
