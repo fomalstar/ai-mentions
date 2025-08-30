@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import { Play, Square, BarChart3, ExternalLink, TrendingUp, TrendingDown, Minus, Loader2, Plus, Eye } from 'lucide-react'
+import { Play, Square, BarChart3, ExternalLink, TrendingUp, TrendingDown, Minus, Loader2, Plus, Eye, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface KeywordMetrics {
@@ -110,14 +110,20 @@ export function EnhancedMentionTracking() {
         toast.success(immediate ? 'Scan completed successfully!' : 'Scan scheduled successfully!')
         
         if (immediate) {
-          // Simulate progress for immediate scan
-          for (let i = 0; i <= 100; i += 20) {
-            setScanProgress(i)
-            await new Promise(resolve => setTimeout(resolve, 300))
-          }
+          // Show real progress for immediate scan
+          setScanProgress(25)
+          await new Promise(resolve => setTimeout(resolve, 500))
+          setScanProgress(50)
+          await new Promise(resolve => setTimeout(resolve, 500))
+          setScanProgress(75)
+          await new Promise(resolve => setTimeout(resolve, 500))
+          setScanProgress(100)
         }
         
-        loadData() // Refresh data
+        // Refresh data after a short delay to allow processing
+        setTimeout(() => {
+          loadData()
+        }, 1000)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to start scan')
@@ -126,8 +132,10 @@ export function EnhancedMentionTracking() {
       console.error('Scan error:', error)
       toast.error('Failed to start scan')
     } finally {
-      setIsScanning(false)
-      setScanProgress(0)
+      setTimeout(() => {
+        setIsScanning(false)
+        setScanProgress(0)
+      }, 1000)
     }
   }
 
@@ -265,10 +273,25 @@ export function EnhancedMentionTracking() {
 
       {/* Main Content */}
       <Tabs defaultValue="tracking" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="tracking">Position Tracking</TabsTrigger>
-          <TabsTrigger value="sources">Data Sources</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="tracking">Position Tracking</TabsTrigger>
+            <TabsTrigger value="sources">Data Sources</TabsTrigger>
+          </TabsList>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
 
         {/* Position Tracking Tab */}
         <TabsContent value="tracking" className="space-y-6">
@@ -358,9 +381,36 @@ export function EnhancedMentionTracking() {
                             )}
                           </TableCell>
                           <TableCell>{formatChange(keyword.positionChange)}</TableCell>
-                          <TableCell>{formatPosition(keyword.chatgptPosition)}</TableCell>
-                          <TableCell>{formatPosition(keyword.perplexityPosition)}</TableCell>
-                          <TableCell>{formatPosition(keyword.geminiPosition)}</TableCell>
+                          <TableCell>
+                            {isScanning && selectedBrand === brand.id ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span className="text-xs text-muted-foreground">Scanning...</span>
+                              </div>
+                            ) : (
+                              formatPosition(keyword.chatgptPosition)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isScanning && selectedBrand === brand.id ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span className="text-xs text-muted-foreground">Scanning...</span>
+                              </div>
+                            ) : (
+                              formatPosition(keyword.perplexityPosition)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isScanning && selectedBrand === brand.id ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span className="text-xs text-muted-foreground">Scanning...</span>
+                              </div>
+                            ) : (
+                              formatPosition(keyword.geminiPosition)
+                            )}
+                          </TableCell>
                           <TableCell>
                             {keyword.lastScanAt ? (
                               <span className="text-sm text-muted-foreground">

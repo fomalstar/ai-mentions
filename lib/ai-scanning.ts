@@ -80,21 +80,32 @@ export class AIScanningService {
     const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // Use our existing Perplexity client to get real-time search results
-      const response = await perplexityClient.getRealTimeInsights(query)
+      // Step 1: Get initial response from Perplexity
+      const initialResponse = await perplexityClient.getRealTimeInsights(query)
       
-      // Analyze the response for brand mentions
-      const analysis = await this.analyzeBrandMention(response, request.brandName)
+      // Step 2: Analyze the response for brand mentions
+      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
       
-      // Extract source URLs (Perplexity doesn't provide them directly, so we'll need to enhance this)
-      const sourceUrls = this.extractSourceUrls(response)
+      // Step 3: If brand is mentioned, ask for source URLs
+      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
+      if (analysis.brandMentioned) {
+        const sourceQuery = `For the previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
+        try {
+          const sourceResponse = await perplexityClient.getRealTimeInsights(sourceQuery)
+          sourceUrls = this.extractSourceUrls(sourceResponse)
+        } catch (sourceError) {
+          console.warn('Failed to get source URLs from Perplexity:', sourceError)
+          // Fallback to basic URL extraction from initial response
+          sourceUrls = this.extractSourceUrls(initialResponse)
+        }
+      }
       
       return {
         platform: 'perplexity',
         query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: response,
+        responseText: initialResponse,
         brandContext: analysis.context,
         sourceUrls,
         confidence: analysis.confidence,
@@ -107,26 +118,41 @@ export class AIScanningService {
   }
 
   /**
-   * Scan ChatGPT for brand mentions (mock implementation for now)
+   * Scan ChatGPT for brand mentions using OpenAI API
    */
   private async scanChatGPT(request: ScanRequest): Promise<ScanResult> {
     const startTime = Date.now()
     const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // TODO: Implement real ChatGPT API integration
-      // For now, return mock data
-      const mockResponse = await this.getMockChatGPTResponse(request)
-      const analysis = await this.analyzeBrandMention(mockResponse.text, request.brandName)
+      // Step 1: Get initial response from ChatGPT
+      const initialResponse = await this.queryChatGPT(query)
+      
+      // Step 2: Analyze the response for brand mentions
+      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
+      
+      // Step 3: If brand is mentioned, ask for source URLs
+      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
+      if (analysis.brandMentioned) {
+        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
+        try {
+          const sourceResponse = await this.queryChatGPT(sourceQuery)
+          sourceUrls = this.extractSourceUrls(sourceResponse)
+        } catch (sourceError) {
+          console.warn('Failed to get source URLs from ChatGPT:', sourceError)
+          // Fallback to basic URL extraction from initial response
+          sourceUrls = this.extractSourceUrls(initialResponse)
+        }
+      }
       
       return {
         platform: 'chatgpt',
         query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: mockResponse.text,
+        responseText: initialResponse,
         brandContext: analysis.context,
-        sourceUrls: mockResponse.sources,
+        sourceUrls,
         confidence: analysis.confidence,
         scanDuration: Date.now() - startTime
       }
@@ -137,32 +163,101 @@ export class AIScanningService {
   }
 
   /**
-   * Scan Gemini for brand mentions (mock implementation for now)
+   * Scan Gemini for brand mentions using Google Gemini API
    */
   private async scanGemini(request: ScanRequest): Promise<ScanResult> {
     const startTime = Date.now()
     const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // TODO: Implement real Gemini API integration
-      // For now, return mock data
-      const mockResponse = await this.getMockGeminiResponse(request)
-      const analysis = await this.analyzeBrandMention(mockResponse.text, request.brandName)
+      // Step 1: Get initial response from Gemini
+      const initialResponse = await this.queryGemini(query)
+      
+      // Step 2: Analyze the response for brand mentions
+      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
+      
+      // Step 3: If brand is mentioned, ask for source URLs
+      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
+      if (analysis.brandMentioned) {
+        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
+        try {
+          const sourceResponse = await this.queryGemini(sourceQuery)
+          sourceUrls = this.extractSourceUrls(sourceResponse)
+        } catch (sourceError) {
+          console.warn('Failed to get source URLs from Gemini:', sourceError)
+          // Fallback to basic URL extraction from initial response
+          sourceUrls = this.extractSourceUrls(initialResponse)
+        }
+      }
       
       return {
         platform: 'gemini',
         query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: mockResponse.text,
+        responseText: initialResponse,
         brandContext: analysis.context,
-        sourceUrls: mockResponse.sources,
+        sourceUrls,
         confidence: analysis.confidence,
         scanDuration: Date.now() - startTime
       }
     } catch (error) {
       console.error('Gemini scanning error:', error)
       return this.createErrorResult('gemini', query, Date.now() - startTime)
+    }
+  }
+
+  /**
+   * Query ChatGPT using OpenAI API
+   */
+  private async queryChatGPT(query: string): Promise<string> {
+    try {
+      const response = await fetch('/api/openai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: query,
+          model: 'gpt-4',
+          maxTokens: 1000
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error(`ChatGPT API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.response || 'No response from ChatGPT'
+    } catch (error) {
+      console.error('ChatGPT query error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Query Gemini using Google Gemini API
+   */
+  private async queryGemini(query: string): Promise<string> {
+    try {
+      const response = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: query,
+          model: 'gemini-pro',
+          maxTokens: 1000
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.response || 'No response from Gemini'
+    } catch (error) {
+      console.error('Gemini query error:', error)
+      throw error
     }
   }
 
@@ -288,19 +383,59 @@ export class AIScanningService {
     title: string
     date?: string
   }> {
-    // Simple URL extraction - can be enhanced with better parsing
+    const sources: Array<{url: string, domain: string, title: string, date?: string}> = []
+    
+    // Enhanced URL extraction with title parsing
     const urlRegex = /https?:\/\/[^\s]+/g
     const urls = responseText.match(urlRegex) || []
     
-    return urls.map(url => {
-      const domain = new URL(url).hostname
-      return {
-        url,
-        domain,
-        title: domain, // For now, use domain as title
-        date: new Date().toISOString()
+    // Try to extract titles from the text around URLs
+    urls.forEach(url => {
+      try {
+        const domain = new URL(url).hostname
+        
+        // Look for title patterns around the URL
+        const urlIndex = responseText.indexOf(url)
+        const beforeText = responseText.substring(Math.max(0, urlIndex - 100), urlIndex)
+        const afterText = responseText.substring(urlIndex + url.length, Math.min(responseText.length, urlIndex + url.length + 100))
+        
+        // Try to find a title (look for quotes, dashes, or common patterns)
+        let title = domain
+        const titlePatterns = [
+          /[""]([^""]+)[""]/g,  // Quoted text
+          /[-–—]\s*([^.\n]+)/g,  // Text after dash
+          /:\s*([^.\n]+)/g,      // Text after colon
+          /([A-Z][^.\n]{5,50})/g // Capitalized phrases
+        ]
+        
+        for (const pattern of titlePatterns) {
+          const matches = [...beforeText.matchAll(pattern), ...afterText.matchAll(pattern)]
+          if (matches.length > 0) {
+            const match = matches[0][1]?.trim()
+            if (match && match.length > 5 && match.length < 100) {
+              title = match
+              break
+            }
+          }
+        }
+        
+        sources.push({
+          url,
+          domain,
+          title: title.length > 100 ? title.substring(0, 100) + '...' : title,
+          date: new Date().toISOString()
+        })
+      } catch (error) {
+        console.warn('Failed to parse URL:', url, error)
       }
-    }).slice(0, 5) // Limit to 5 URLs
+    })
+    
+    // Remove duplicates and limit to 10 sources
+    const uniqueSources = sources.filter((source, index, self) => 
+      index === self.findIndex(s => s.url === source.url)
+    )
+    
+    return uniqueSources.slice(0, 10)
   }
 
   /**
