@@ -193,71 +193,191 @@ export default function Dashboard() {
     }
   }
 
-  // Helper functions for generating realistic data
-  const getRealisticDomain = (platform: string) => {
-    const domains = {
-      chatgpt: [
-        'openai.com',
-        'chatgpt.com',
-        'ai-research.org',
-        'machinelearning.ai',
-        'artificialintelligence.com'
-      ],
-      perplexity: [
-        'perplexity.ai',
-        'ai-search.com',
-        'intelligentsearch.net',
-        'ai-research.org',
-        'search-ai.com'
-      ],
-      gemini: [
-        'google.com',
-        'gemini.google.com',
-        'ai.google.com',
-        'research.google.com',
-        'deepmind.com'
-      ]
+  // Real AI integration functions
+  const queryAI = async (platform: string, topic: string): Promise<string> => {
+    try {
+      let response: string = ''
+      
+      switch (platform) {
+        case 'chatgpt':
+          const chatgptResponse = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: topic })
+          })
+          if (chatgptResponse.ok) {
+            const data = await chatgptResponse.json()
+            response = data.response
+          }
+          break
+          
+        case 'perplexity':
+          const perplexityResponse = await fetch('/api/perplexity/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: topic })
+          })
+          if (perplexityResponse.ok) {
+            const data = await perplexityResponse.json()
+            response = data.response
+          }
+          break
+          
+        case 'gemini':
+          const geminiResponse = await fetch('/api/gemini/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: topic })
+          })
+          if (geminiResponse.ok) {
+            const data = await geminiResponse.json()
+            response = data.response
+          }
+          break
+      }
+      
+      return response || `No response from ${platform}`
+    } catch (error) {
+      console.error(`Error querying ${platform}:`, error)
+      return `Error getting response from ${platform}`
     }
-    
-    const platformDomains = domains[platform as keyof typeof domains] || domains.chatgpt
-    return platformDomains[Math.floor(Math.random() * platformDomains.length)]
   }
 
-  const generateSlug = (topic: string) => {
-    return topic
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 50)
+  const getSourceURLs = async (platform: string, topic: string, originalResponse: string): Promise<any[]> => {
+    try {
+      const sourceQuery = `For your previous response about "${topic}", please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title. If you don't have specific sources, please say so.`
+      
+      let sourceResponse: string = ''
+      
+      switch (platform) {
+        case 'chatgpt':
+          const chatgptResponse = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: sourceQuery })
+          })
+          if (chatgptResponse.ok) {
+            const data = await chatgptResponse.json()
+            sourceResponse = data.response
+          }
+          break
+          
+        case 'perplexity':
+          const perplexityResponse = await fetch('/api/perplexity/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: sourceQuery })
+          })
+          if (perplexityResponse.ok) {
+            const data = await perplexityResponse.json()
+            sourceResponse = data.response
+          }
+          break
+          
+        case 'gemini':
+          const geminiResponse = await fetch('/api/gemini/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: sourceQuery })
+          })
+          if (geminiResponse.ok) {
+            const data = await geminiResponse.json()
+            sourceResponse = data.response
+          }
+          break
+      }
+      
+      // Extract real URLs from the AI response
+      const urls = extractRealURLs(sourceResponse)
+      
+      return urls.map((url, index) => ({
+        id: `source-${Date.now()}-${index}`,
+        url: url,
+        domain: new URL(url).hostname,
+        title: `Source from ${platform} for ${topic}`,
+        date: new Date().toISOString(),
+        keyword: topic,
+        platform
+      }))
+      
+    } catch (error) {
+      console.error(`Error getting source URLs from ${platform}:`, error)
+      return []
+    }
   }
 
-  const getRealisticTitle = (platform: string, topic: string, keyword: string) => {
-    const titles = {
-      chatgpt: [
-        `AI Analysis: ${topic} - Insights from ChatGPT`,
-        `ChatGPT Research: ${topic} and ${keyword}`,
-        `AI-Powered Analysis of ${topic}`,
-        `ChatGPT's Perspective on ${topic}`,
-        `AI Research Report: ${topic}`
-      ],
-      perplexity: [
-        `Perplexity AI Research: ${topic}`,
-        `AI Search Results: ${topic} Analysis`,
-        `Perplexity's AI Analysis of ${topic}`,
-        `Intelligent Search: ${topic} Research`,
-        `AI-Powered Search: ${topic} Insights`
-      ],
-      gemini: [
-        `Google AI Research: ${topic}`,
-        `Gemini AI Analysis: ${topic}`,
-        `AI Research by Google: ${topic}`,
-        `Google's AI Perspective on ${topic}`,
-        `Gemini AI: ${topic} Research Report`
-      ]
+  const extractRealURLs = (text: string): string[] => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const urls = text.match(urlRegex) || []
+    return urls.filter(url => {
+      try {
+        new URL(url)
+        return true
+      } catch {
+        return false
+      }
+    }).slice(0, 5) // Limit to 5 URLs
+  }
+
+  const analyzeBrandMention = (response: string, brandName: string): boolean => {
+    if (!response || !brandName) return false
+    
+    const normalizedResponse = response.toLowerCase()
+    const normalizedBrand = brandName.toLowerCase()
+    
+    // Check for exact brand name mentions
+    if (normalizedResponse.includes(normalizedBrand)) return true
+    
+    // Check for partial matches (e.g., "Icecream brand" vs "Icecream")
+    const brandWords = normalizedBrand.split(' ')
+    return brandWords.some(word => 
+      word.length > 2 && normalizedResponse.includes(word)
+    )
+  }
+
+  const calculateBrandPosition = (response: string, brandName: string): number => {
+    if (!response || !brandName) return null
+    
+    const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0)
+    
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i].toLowerCase()
+      const normalizedBrand = brandName.toLowerCase()
+      
+      if (sentence.includes(normalizedBrand)) {
+        // Position is 1-based, and we want to show ranking
+        return Math.min(i + 1, 5) // Cap at position 5
+      }
     }
     
-    const platformTitles = titles[platform as keyof typeof titles] || titles.chatgpt
-    return platformTitles[Math.floor(Math.random() * platformTitles.length)]
+    return null
+  }
+
+  const determineMentionType = (response: string, brandName: string): 'positive' | 'negative' | 'neutral' => {
+    if (!response || !brandName) return 'neutral'
+    
+    const normalizedResponse = response.toLowerCase()
+    const normalizedBrand = brandName.toLowerCase()
+    
+    // Find the sentence containing the brand mention
+    const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0)
+    const brandSentence = sentences.find(s => 
+      s.toLowerCase().includes(normalizedBrand)
+    )
+    
+    if (!brandSentence) return 'neutral'
+    
+    const sentence = brandSentence.toLowerCase()
+    
+    // Positive indicators
+    const positiveWords = ['best', 'excellent', 'amazing', 'great', 'top', 'premium', 'quality', 'recommended', 'outstanding', 'superior']
+    if (positiveWords.some(word => sentence.includes(word))) return 'positive'
+    
+    // Negative indicators
+    const negativeWords = ['worst', 'bad', 'poor', 'terrible', 'avoid', 'disappointing', 'inferior', 'subpar', 'unreliable']
+    if (negativeWords.some(word => sentence.includes(word))) return 'negative'
+    
+    return 'neutral'
   }
 
   const startFullProjectScan = async (projectId: string, projectName: string) => {
