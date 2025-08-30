@@ -15,7 +15,7 @@ NEXTAUTH_SECRET="your-super-secret-key-here-change-in-production"
 NEXTAUTH_URL="http://localhost:3000"
 
 # OpenAI Configuration
-OPENAI_API_KEY="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"
+OPENAI_API_KEY="your-openai-api-key-here"
 
 # OAuth Providers (Add these when you create the apps)
 # GOOGLE_CLIENT_ID="your-google-client-id"
