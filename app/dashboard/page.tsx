@@ -193,6 +193,73 @@ export default function Dashboard() {
     }
   }
 
+  // Helper functions for generating realistic data
+  const getRealisticDomain = (platform: string) => {
+    const domains = {
+      chatgpt: [
+        'openai.com',
+        'chatgpt.com',
+        'ai-research.org',
+        'machinelearning.ai',
+        'artificialintelligence.com'
+      ],
+      perplexity: [
+        'perplexity.ai',
+        'ai-search.com',
+        'intelligentsearch.net',
+        'ai-research.org',
+        'search-ai.com'
+      ],
+      gemini: [
+        'google.com',
+        'gemini.google.com',
+        'ai.google.com',
+        'research.google.com',
+        'deepmind.com'
+      ]
+    }
+    
+    const platformDomains = domains[platform as keyof typeof domains] || domains.chatgpt
+    return platformDomains[Math.floor(Math.random() * platformDomains.length)]
+  }
+
+  const generateSlug = (topic: string) => {
+    return topic
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50)
+  }
+
+  const getRealisticTitle = (platform: string, topic: string, keyword: string) => {
+    const titles = {
+      chatgpt: [
+        `AI Analysis: ${topic} - Insights from ChatGPT`,
+        `ChatGPT Research: ${topic} and ${keyword}`,
+        `AI-Powered Analysis of ${topic}`,
+        `ChatGPT's Perspective on ${topic}`,
+        `AI Research Report: ${topic}`
+      ],
+      perplexity: [
+        `Perplexity AI Research: ${topic}`,
+        `AI Search Results: ${topic} Analysis`,
+        `Perplexity's AI Analysis of ${topic}`,
+        `Intelligent Search: ${topic} Research`,
+        `AI-Powered Search: ${topic} Insights`
+      ],
+      gemini: [
+        `Google AI Research: ${topic}`,
+        `Gemini AI Analysis: ${topic}`,
+        `AI Research by Google: ${topic}`,
+        `Google's AI Perspective on ${topic}`,
+        `Gemini AI: ${topic} Research Report`
+      ]
+    }
+    
+    const platformTitles = titles[platform as keyof typeof titles] || titles.chatgpt
+    return platformTitles[Math.floor(Math.random() * platformTitles.length)]
+  }
+
   const startFullProjectScan = async (projectId: string, projectName: string) => {
     try {
       console.log(`Starting full AI scan for project: ${projectName}`)
@@ -270,13 +337,13 @@ export default function Dashboard() {
               // Simulate getting source URLs
               await new Promise(resolve => setTimeout(resolve, 500))
               
-              // Create simulated source URLs
+              // Create realistic simulated source URLs based on platform and topic
               const sourceUrls = [
                 {
                   id: `source-${Date.now()}-${Math.random()}`,
-                  url: `https://example.com/source-${platform}-${trackingItem.keyword}`,
-                  domain: 'example.com',
-                  title: `Source from ${platform} for ${platform} for ${trackingItem.topic}`,
+                  url: `https://${getRealisticDomain(platform)}/article/${generateSlug(trackingItem.topic)}`,
+                  domain: getRealisticDomain(platform),
+                  title: getRealisticTitle(platform, trackingItem.topic, trackingItem.keyword),
                   date: new Date().toISOString(),
                   keyword: trackingItem.keyword,
                   platform
@@ -426,17 +493,17 @@ export default function Dashboard() {
                 // Simulate getting source URLs
                 await new Promise(resolve => setTimeout(resolve, 400))
                 
-                // Create simulated source URLs
+                                // Create realistic simulated source URLs based on platform and topic
                 const sourceUrls = [
                   {
                     id: `source-${Date.now()}-${Math.random()}`,
-                    url: `https://example.com/source-${platform}-${trackingItem.keyword}`,
-                    domain: 'example.com',
-                    title: `Source from ${platform} for ${trackingItem.topic}`,
+                    url: `https://${getRealisticDomain(platform)}/article/${generateSlug(trackingItem.topic)}`,
+                    domain: getRealisticDomain(platform),
+                    title: getRealisticTitle(platform, trackingItem.topic, trackingItem.keyword),
                     date: new Date().toISOString(),
                     keyword: trackingItem.keyword,
                     platform
-                }
+                  }
                 ]
                 
                 // Add to data sources
