@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { openai } from '@/lib/openai'
+import OpenAI from 'openai'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +21,11 @@ export async function POST(request: NextRequest) {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API not configured' }, { status: 500 })
     }
+
+    // Create OpenAI client
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
 
     // Create chat completion
     const completion = await openai.chat.completions.create({
