@@ -1486,27 +1486,6 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
-                    <Button 
-                      size="sm"
-                      onClick={() => startFullProjectScan(projectId, projectData.projectName)}
-                      disabled={scanningProjects.has(projectId)}
-                      className={scanningProjects.has(projectId) ? 
-                        "bg-red-600 hover:bg-red-700 text-white" : 
-                        "bg-green-600 hover:bg-green-700 text-white"
-                      }
-                    >
-                      {scanningProjects.has(projectId) ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Scanning...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 mr-2" />
-                          Run Scan
-                        </>
-                      )}
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -1566,7 +1545,27 @@ export default function Dashboard() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="default">Active</Badge>
-
+                                <Button 
+                                  size="sm"
+                                  onClick={() => startFullProjectScan(projectId, projectData.projectName)}
+                                  disabled={scanningProjects.has(projectId)}
+                                  className={scanningProjects.has(projectId) ? 
+                                    "bg-red-600 hover:bg-red-700 text-white" : 
+                                    "bg-green-600 hover:bg-green-700 text-white"
+                                  }
+                                >
+                                  {scanningProjects.has(projectId) ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                      Scanning...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Zap className="w-4 h-4 mr-2" />
+                                      Run Scan
+                                    </>
+                                  )}
+                                </Button>
                                 <Button variant="outline" size="sm">
                                   <Settings className="w-4 h-4" />
                                 </Button>
