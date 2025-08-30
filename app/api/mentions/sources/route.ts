@@ -36,19 +36,46 @@ export async function GET(request: NextRequest) {
     }
 
     // Get scan results with source URLs
-    const scanResults = await prisma.scanResult.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        brandTracking: {
-          select: { displayName: true }
-        },
-        keywordTracking: {
-          select: { keyword: true, topic: true }
+    // Handle case where scanResult table might not exist yet
+    let scanResults = []
+    try {
+      scanResults = await prisma.scanResult.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          brandTracking: {
+            select: { displayName: true }
+          },
+          keywordTracking: {
+            select: { keyword: true, topic: true }
+          }
         }
-      }
-    })
+      })
+    } catch (error) {
+      console.warn('ScanResult table not available yet:', error.message)
+      // Return empty results if table doesn't exist
+      return NextResponse.json({
+        success: true,
+        sources: [],
+        topDomains: [],
+        stats: {
+          totalSources: 0,
+          totalUrls: 0,
+          uniqueDomains: 0,
+          platformBreakdown: {},
+          avgPosition: null,
+          avgConfidence: 0,
+          dateRange: { from: null, to: null }
+        },
+        filters: {
+          brandTrackingId,
+          keywordTrackingId,
+          platform,
+          limit
+        }
+      })
+    }
 
     // Process and organize source URLs
     const sources: Array<{

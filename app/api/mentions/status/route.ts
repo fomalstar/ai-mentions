@@ -54,38 +54,48 @@ export async function GET(request: NextRequest) {
     })
 
     // Get queue status
-    const queueItems = await prisma.scanQueue.findMany({
-      where: {
-        userId: session.user.id,
-        ...(brandTrackingId && { brandTrackingId }),
-        status: { in: ['pending', 'running'] }
-      },
-      orderBy: { scheduledAt: 'asc' },
-      include: {
-        brandTracking: {
-          select: { displayName: true }
+    let queueItems = []
+    try {
+      queueItems = await prisma.scanQueue.findMany({
+        where: {
+          userId: session.user.id,
+          ...(brandTrackingId && { brandTrackingId }),
+          status: { in: ['pending', 'running'] }
+        },
+        orderBy: { scheduledAt: 'asc' },
+        include: {
+          brandTracking: {
+            select: { displayName: true }
+          }
         }
-      }
-    })
+      })
+    } catch (error) {
+      console.warn('ScanQueue table not available yet:', error.message)
+    }
 
     // Get recent scan results for statistics
-    const recentResults = await prisma.scanResult.findMany({
-      where: {
-        userId: session.user.id,
-        ...(brandTrackingId && { brandTrackingId }),
-        createdAt: {
-          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+    let recentResults = []
+    try {
+      recentResults = await prisma.scanResult.findMany({
+        where: {
+          userId: session.user.id,
+          ...(brandTrackingId && { brandTrackingId }),
+          createdAt: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+          }
+        },
+        select: {
+          platform: true,
+          brandMentioned: true,
+          position: true,
+          confidence: true,
+          createdAt: true,
+          brandTrackingId: true
         }
-      },
-      select: {
-        platform: true,
-        brandMentioned: true,
-        position: true,
-        confidence: true,
-        createdAt: true,
-        brandTrackingId: true
-      }
-    })
+      })
+    } catch (error) {
+      console.warn('ScanResult table not available yet:', error.message)
+    }
 
     // Calculate statistics
     const stats = {

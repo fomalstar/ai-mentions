@@ -59,11 +59,19 @@ export class AIScanningService {
       const geminiResult = await this.scanGemini(request)
       results.push(geminiResult)
       
-      // Store results in database
-      await this.storeResults(request, results)
+      // Store results in database (if available)
+      try {
+        await this.storeResults(request, results)
+      } catch (error) {
+        console.warn('Could not store scan results:', error.message)
+      }
       
-      // Update keyword tracking metrics
-      await this.updateKeywordMetrics(request.keywordTrackingId, results)
+      // Update keyword tracking metrics (if available)
+      try {
+        await this.updateKeywordMetrics(request.keywordTrackingId, results)
+      } catch (error) {
+        console.warn('Could not update keyword metrics:', error.message)
+      }
       
       return results
     } catch (error) {

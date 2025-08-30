@@ -1,260 +1,162 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 Starting database setup...')
+    const session = await getServerSession(authOptions)
     
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`
-    console.log('✅ Database connection successful')
-    
-    // Check if tables exist
-    const tables = await prisma.$queryRaw`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-    ` as any[]
-    
-    console.log('📋 Existing tables:', tables.map(t => t.table_name))
-    
-    // Check if required tables exist
-    const requiredTables = [
-      'users', 'accounts', 'sessions', 'verification_tokens',
-      'brand_tracking', 'keyword_tracking', 'scan_results', 'scan_queue'
-    ]
-    const existingTableNames = tables.map(t => t.table_name)
-    const missingTables = requiredTables.filter(table => !existingTableNames.includes(table))
-    
-    if (missingTables.length > 0) {
-      console.log('❌ Missing tables:', missingTables)
-      console.log('🔧 Attempting to create tables automatically...')
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if user is admin (you can modify this logic)
+    if (session.user.email !== 'foma@example.com') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
+    console.log('🔄 Setting up enhanced mention tracking database...')
+
+    // Try to create the missing tables by running Prisma commands
+    try {
+      const { execSync } = require('child_process')
       
+      // Push the schema to create missing tables
+      console.log('📦 Pushing schema to database...')
+      execSync('npx prisma db push --accept-data-loss', { 
+        stdio: 'inherit',
+        env: { ...process.env }
+      })
+      
+      // Generate Prisma client
+      console.log('🔧 Generating Prisma client...')
+      execSync('npx prisma generate', { 
+        stdio: 'inherit',
+        env: { ...process.env }
+      })
+      
+      console.log('✅ Database setup completed successfully!')
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Database setup completed successfully',
+        timestamp: new Date().toISOString()
+      })
+      
+    } catch (error) {
+      console.error('❌ Database setup failed:', error)
+      
+      // Fallback: try to create tables manually via SQL
       try {
-        // Create tables using raw SQL
-        await createAllTables()
-        console.log('✅ Tables created successfully')
+        console.log('🔄 Attempting manual table creation...')
+        
+        // Create scan_results table if it doesn't exist
+        await prisma.$executeRaw`
+          CREATE TABLE IF NOT EXISTS scan_results (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            brand_tracking_id TEXT NOT NULL,
+            keyword_tracking_id TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            query TEXT NOT NULL,
+            brand_mentioned BOOLEAN DEFAULT false,
+            position INTEGER,
+            response_text TEXT,
+            brand_context TEXT,
+            source_urls JSONB,
+            confidence DOUBLE PRECISION,
+            scan_duration INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+        
+        // Create scan_queue table if it doesn't exist
+        await prisma.$executeRaw`
+          CREATE TABLE IF NOT EXISTS scan_queue (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            brand_tracking_id TEXT NOT NULL,
+            keyword_tracking_id TEXT,
+            status TEXT DEFAULT 'pending',
+            priority INTEGER DEFAULT 5,
+            scheduled_at TIMESTAMP NOT NULL,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            attempts INTEGER DEFAULT 0,
+            max_attempts INTEGER DEFAULT 3,
+            last_error TEXT,
+            scan_type TEXT NOT NULL,
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+        
+        console.log('✅ Manual table creation completed!')
         
         return NextResponse.json({
-          status: 'success',
-          message: 'Database tables created successfully!',
-          createdTables: missingTables,
-          existingTables: existingTableNames,
+          success: true,
+          message: 'Database setup completed via manual table creation',
           timestamp: new Date().toISOString()
         })
-      } catch (createError) {
-        console.error('❌ Failed to create tables:', createError)
+        
+      } catch (manualError) {
+        console.error('❌ Manual table creation also failed:', manualError)
         
         return NextResponse.json({
-          status: 'error',
-          message: 'Could not create database tables automatically.',
-          missingTables,
-          existingTables: existingTableNames,
-          error: createError instanceof Error ? createError.message : 'Unknown error',
-          instructions: [
-            'The database needs to be set up manually.',
-            'Contact support or use a different database setup method.'
-          ]
+          success: false,
+          error: 'Database setup failed',
+          details: {
+            prismaError: error.message,
+            manualError: manualError.message
+          }
         }, { status: 500 })
       }
     }
     
-    // Test creating a user (this will verify all relationships work)
-    try {
-      const testUser = await prisma.user.upsert({
-        where: { email: 'test@aimentions.com' },
-        update: { name: 'Test User Updated' },
-        create: {
-          email: 'test@aimentions.com',
-          name: 'Test User',
-          subscriptionTier: 'free',
-          emailVerified: new Date()
-        }
-      })
-      
-      console.log('✅ Test user created/updated:', testUser.id)
-    } catch (error) {
-      console.error('❌ Error creating test user:', error)
-    }
-    
-    return NextResponse.json({
-      status: 'success',
-      message: 'Database setup completed successfully',
-      existingTables: existingTableNames,
-      timestamp: new Date().toISOString()
-    })
-    
   } catch (error) {
-    console.error('❌ Database setup failed:', error)
-    
-    return NextResponse.json({
-      status: 'error',
-      message: 'Database setup failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
+    console.error('Database setup API error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to setup database',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }
 
-// Function to create all required tables using raw SQL
-async function createAllTables() {
-  console.log('🔧 Creating all required tables...')
-  
-  // Create users table
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS "users" (
-      "id" TEXT NOT NULL,
-      "name" TEXT,
-      "email" TEXT NOT NULL,
-      "emailVerified" TIMESTAMP(3),
-      "image" TEXT,
-      "password" TEXT,
-      "subscriptionTier" TEXT NOT NULL DEFAULT 'free',
-      "stripeCustomerId" TEXT,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "users_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "users_email_key" UNIQUE ("email"),
-      CONSTRAINT "users_stripeCustomerId_key" UNIQUE ("stripeCustomerId")
-    )
-  `
-  
-  // Create accounts table
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS "accounts" (
-      "id" TEXT NOT NULL,
-      "userId" TEXT NOT NULL,
-      "type" TEXT NOT NULL,
-      "provider" TEXT NOT NULL,
-      "providerAccountId" TEXT NOT NULL,
-      "refresh_token" TEXT,
-      "access_token" TEXT,
-      "expires_at" INTEGER,
-      "token_type" TEXT,
-      "scope" TEXT,
-      "id_token" TEXT,
-      "session_state" TEXT,
-      CONSTRAINT "accounts_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "accounts_provider_providerAccountId_key" UNIQUE ("provider", "providerAccountId"),
-      CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  // Create sessions table
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS "sessions" (
-      "id" TEXT NOT NULL,
-      "sessionToken" TEXT NOT NULL,
-      "userId" TEXT NOT NULL,
-      "expires" TIMESTAMP(3) NOT NULL,
-      CONSTRAINT "sessions_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "sessions_sessionToken_key" UNIQUE ("sessionToken"),
-      CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  // Create verification_tokens table
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS "verification_tokens" (
-      "identifier" TEXT NOT NULL,
-      "token" TEXT NOT NULL,
-      "expires" TIMESTAMP(3) NOT NULL,
-      CONSTRAINT "verification_tokens_pkey" PRIMARY KEY ("identifier", "token"),
-      CONSTRAINT "verification_tokens_token_key" UNIQUE ("token")
-    )
-  `
-  
-  // Drop existing tables if they exist (they have wrong schema)
-  await prisma.$executeRaw`DROP TABLE IF EXISTS "scan_queue" CASCADE`
-  await prisma.$executeRaw`DROP TABLE IF EXISTS "scan_results" CASCADE`
-  await prisma.$executeRaw`DROP TABLE IF EXISTS "keyword_tracking" CASCADE`
-  await prisma.$executeRaw`DROP TABLE IF EXISTS "brand_tracking" CASCADE`
-  
-  // Create mention tracking tables with correct schema
-  await prisma.$executeRaw`
-    CREATE TABLE "brand_tracking" (
-      "id" TEXT NOT NULL,
-      "userId" TEXT NOT NULL,
-      "brandName" TEXT NOT NULL,
-      "displayName" TEXT NOT NULL,
-      "website" TEXT,
-      "description" TEXT,
-      "keywords" TEXT[] DEFAULT ARRAY[]::TEXT[],
-      "competitors" TEXT[] DEFAULT ARRAY[]::TEXT[],
-      "isActive" BOOLEAN NOT NULL DEFAULT true,
-      "scanningEnabled" BOOLEAN NOT NULL DEFAULT true,
-      "lastScanAt" TIMESTAMP(3),
-      "nextScanAt" TIMESTAMP(3),
-      "scanInterval" INTEGER NOT NULL DEFAULT 24,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "brand_tracking_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "brand_tracking_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  await prisma.$executeRaw`
-    CREATE TABLE "keyword_tracking" (
-      "id" TEXT NOT NULL,
-      "brandTrackingId" TEXT NOT NULL,
-      "keyword" TEXT NOT NULL,
-      "projectName" TEXT NOT NULL,
-      "avgPosition" DOUBLE PRECISION,
-      "positionChange" INTEGER DEFAULT 0,
-      "chatgptPosition" INTEGER,
-      "perplexityPosition" INTEGER,
-      "geminiPosition" INTEGER,
-      "lastScanned" TIMESTAMP(3),
-      "isActive" BOOLEAN NOT NULL DEFAULT true,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "keyword_tracking_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "keyword_tracking_brandTrackingId_fkey" FOREIGN KEY ("brandTrackingId") REFERENCES "brand_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  await prisma.$executeRaw`
-    CREATE TABLE "scan_results" (
-      "id" TEXT NOT NULL,
-      "userId" TEXT NOT NULL,
-      "brandTrackingId" TEXT NOT NULL,
-      "keywordTrackingId" TEXT NOT NULL,
-      "platform" TEXT NOT NULL,
-      "query" TEXT NOT NULL,
-      "brandMentioned" BOOLEAN NOT NULL DEFAULT false,
-      "position" INTEGER,
-      "responseText" TEXT,
-      "brandContext" TEXT,
-      "sourceUrls" TEXT[] DEFAULT ARRAY[]::TEXT[],
-      "metadata" TEXT,
-      "scanDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "scan_results_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "scan_results_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "scan_results_brandTrackingId_fkey" FOREIGN KEY ("brandTrackingId") REFERENCES "brand_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-      CONSTRAINT "scan_results_keywordTrackingId_fkey" FOREIGN KEY ("keywordTrackingId") REFERENCES "keyword_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  await prisma.$executeRaw`
-    CREATE TABLE "scan_queue" (
-      "id" TEXT NOT NULL,
-      "keywordTrackingId" TEXT NOT NULL,
-      "scheduledFor" TIMESTAMP(3) NOT NULL,
-      "status" TEXT NOT NULL DEFAULT 'pending',
-      "retryCount" INTEGER NOT NULL DEFAULT 0,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "completedAt" TIMESTAMP(3),
-      CONSTRAINT "scan_queue_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "scan_queue_keywordTrackingId_fkey" FOREIGN KEY ("keywordTrackingId") REFERENCES "keyword_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE
-    )
-  `
-  
-  console.log('✅ All tables created successfully')
-}
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-// Also allow GET for easy testing
-export async function GET() {
-  return POST()
+    // Check database connectivity and table status
+    const tables = ['scan_results', 'scan_queue']
+    const tableStatus: Record<string, boolean> = {}
+    
+    for (const table of tables) {
+      try {
+        await prisma.$queryRaw`SELECT 1 FROM ${table} LIMIT 1`
+        tableStatus[table] = true
+      } catch (error) {
+        tableStatus[table] = false
+      }
+    }
+    
+    return NextResponse.json({
+      success: true,
+      databaseStatus: 'connected',
+      tables: tableStatus,
+      timestamp: new Date().toISOString()
+    })
+    
+  } catch (error) {
+    console.error('Database status check error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to check database status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
 }
