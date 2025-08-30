@@ -276,7 +276,7 @@ export default function Dashboard() {
                   id: `source-${Date.now()}-${Math.random()}`,
                   url: `https://example.com/source-${platform}-${trackingItem.keyword}`,
                   domain: 'example.com',
-                  title: `Source from ${platform} for ${trackingItem.topic}`,
+                  title: `Source from ${platform} for ${platform} for ${trackingItem.topic}`,
                   date: new Date().toISOString(),
                   keyword: trackingItem.keyword,
                   platform
@@ -340,6 +340,159 @@ export default function Dashboard() {
         newSet.delete(projectId)
         return newSet
       })
+    }
+  }
+
+  const startFullScanAllProjects = async () => {
+    try {
+      console.log('Starting full AI scan for ALL projects')
+      
+      // Get all tracking items across all projects
+      const allTrackingItems = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+      
+      if (allTrackingItems.length === 0) {
+        toast.info('No topics to scan. Add some keywords and topics first.')
+        return
+      }
+      
+      // Group tracking items by project
+      const trackingByProject = allTrackingItems.reduce((acc: any, item: any) => {
+        if (!acc[item.projectId]) {
+          acc[item.projectId] = []
+        }
+        acc[item.projectId].push(item)
+        return acc
+      }, {})
+      
+      let totalMentions = 0
+      const platforms = ['chatgpt', 'perplexity', 'gemini']
+      
+      // Add all projects to scanning set
+      const projectIds = Object.keys(trackingByProject)
+      setScanningProjects(new Set(projectIds))
+      
+      // Scan each project
+      for (const [projectId, trackingItems] of Object.entries(trackingByProject)) {
+        const project = projects.find(p => p.id === projectId)
+        if (!project) continue
+        
+        console.log(`Scanning project: ${project.name} with ${trackingItems.length} topics`)
+        
+        // Scan each topic for this project
+        for (const trackingItem of trackingItems) {
+          console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
+          
+          for (const platform of platforms) {
+            try {
+              // Simulate AI query for brand position
+              await new Promise(resolve => setTimeout(resolve, 600))
+              
+              // Simulate finding brand mention (70% chance)
+              const hasMention = Math.random() > 0.3
+              let position = null
+              let mentionType = 'neutral'
+              
+              if (hasMention) {
+                position = Math.floor(Math.random() * 5) + 1
+                mentionType = Math.random() > 0.7 ? 'positive' : 'neutral'
+                totalMentions++
+                
+                // Create mention result
+                const mentionResult = {
+                  id: Date.now().toString() + Math.random(),
+                  projectId,
+                  projectName: project.name,
+                  brandName: project.brandName,
+                  keyword: trackingItem.keyword,
+                  topic: trackingItem.topic,
+                  aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
+                  hasMention: true,
+                  mentionType,
+                  detectedAt: new Date().toISOString(),
+                  source: platform,
+                  content: `Found mention of ${project.brandName} in ${platform} response about "${trackingItem.topic}"`,
+                  position,
+                  platform
+                }
+                
+                // Add to mention results
+                setMentionResults(prev => [mentionResult, ...prev])
+                
+                // Update localStorage
+                const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                const updatedResults = [mentionResult, ...existingResults]
+                localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+                
+                // Simulate getting source URLs
+                await new Promise(resolve => setTimeout(resolve, 400))
+                
+                // Create simulated source URLs
+                const sourceUrls = [
+                  {
+                    id: `source-${Date.now()}-${Math.random()}`,
+                    url: `https://example.com/source-${platform}-${trackingItem.keyword}`,
+                    domain: 'example.com',
+                    title: `Source from ${platform} for ${trackingItem.topic}`,
+                    date: new Date().toISOString(),
+                    keyword: trackingItem.keyword,
+                    platform
+                }
+                ]
+                
+                // Add to data sources
+                setDataSources(prev => [...sourceUrls, ...prev])
+                
+              } else {
+                // No mention found
+                const noMentionResult = {
+                  id: Date.now().toString() + Math.random(),
+                  projectId,
+                  projectName: project.name,
+                  brandName: project.brandName,
+                  keyword: trackingItem.keyword,
+                  topic: trackingItem.topic,
+                  aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
+                  hasMention: false,
+                  mentionType: 'neutral',
+                  detectedAt: new Date().toISOString(),
+                  source: platform,
+                  content: `No mention of ${project.brandName} found in ${platform} response`,
+                  position: null,
+                  platform
+                }
+                
+                // Add to mention results (for tracking purposes)
+                setMentionResults(prev => [noMentionResult, ...prev])
+                
+                // Update localStorage
+                const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                const updatedResults = [noMentionResult, ...existingResults]
+                localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+              }
+              
+            } catch (error) {
+              console.error(`Error scanning ${platform} for topic ${trackingItem.topic}:`, error)
+            }
+          }
+        }
+      }
+      
+      // Show completion message
+      if (totalMentions > 0) {
+        toast.success(`AI scan completed for ALL projects! Found ${totalMentions} brand mentions across all platforms`)
+      } else {
+        toast.info('AI scan completed for all projects. No brand mentions found this time.')
+      }
+      
+      // Refresh data sources
+      setTimeout(fetchDataSources, 1000)
+      
+    } catch (error) {
+      console.error('Error starting full scan for all projects:', error)
+      toast.error('Failed to start scan for all projects')
+    } finally {
+      // Clear scanning set
+      setScanningProjects(new Set())
     }
   }
 
@@ -1486,6 +1639,27 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
+                    <Button 
+                      size="sm"
+                      onClick={() => startFullScanAllProjects()}
+                      disabled={scanningProjects.size > 0}
+                      className={scanningProjects.size > 0 ? 
+                        "bg-red-600 hover:bg-red-700 text-white" : 
+                        "bg-green-600 hover:bg-green-700 text-white"
+                      }
+                    >
+                      {scanningProjects.size > 0 ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Scanning All Projects...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Scan All Projects
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -1545,27 +1719,6 @@ export default function Dashboard() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="default">Active</Badge>
-                                <Button 
-                                  size="sm"
-                                  onClick={() => startFullProjectScan(projectId, projectData.projectName)}
-                                  disabled={scanningProjects.has(projectId)}
-                                  className={scanningProjects.has(projectId) ? 
-                                    "bg-red-600 hover:bg-red-700 text-white" : 
-                                    "bg-green-600 hover:bg-green-700 text-white"
-                                  }
-                                >
-                                  {scanningProjects.has(projectId) ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                      Scanning...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Zap className="w-4 h-4 mr-2" />
-                                      Run Scan
-                                    </>
-                                  )}
-                                </Button>
                                 <Button variant="outline" size="sm">
                                   <Settings className="w-4 h-4" />
                                 </Button>
