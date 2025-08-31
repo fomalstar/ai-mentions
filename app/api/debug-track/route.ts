@@ -161,3 +161,56 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    console.log('🧪 GET request to debug track route')
+    
+    // Check if users table exists and has data
+    try {
+      const userCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM users`
+      console.log('👥 Total users in database:', userCount)
+      
+      // Check if the current session user exists
+      const session = await getServerSession(authOptions)
+      if (session?.user?.email) {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: session.user.email }
+        })
+        console.log('🔍 Current session user in database:', !!existingUser)
+        
+        if (!existingUser) {
+          console.log('❌ Session user not found in database - this is the problem!')
+          return NextResponse.json({
+            success: false,
+            error: 'Session user not found in database',
+            session: { email: session.user.email, id: session.user.id },
+            suggestion: 'User creation in NextAuth callback is failing'
+          })
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Debug info retrieved',
+        userCount: userCount[0]?.count || 0,
+        session: session ? { email: session.user?.email, id: session.user?.id } : null
+      })
+      
+    } catch (dbError) {
+      console.error('❌ Database check failed:', dbError)
+      return NextResponse.json({
+        success: false,
+        error: 'Database check failed',
+        details: dbError instanceof Error ? dbError.message : 'Unknown error'
+      })
+    }
+    
+  } catch (error) {
+    console.error('❌ GET debug track error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to process GET request',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}

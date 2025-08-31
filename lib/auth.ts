@@ -111,25 +111,39 @@ export const authOptions: AuthOptions = {
       if (account?.type === 'oauth' && user.email) {
         try {
           console.log('🔗 OAuth sign in - creating/updating user manually');
+          console.log('📧 User email:', user.email);
+          console.log('👤 User name:', user.name);
           
-          await prisma.user.upsert({
+          const upsertedUser = await prisma.user.upsert({
             where: { email: user.email },
             update: {
               name: user.name,
               image: user.image,
+              updatedAt: new Date()
             },
             create: {
               email: user.email,
               name: user.name,
               image: user.image,
               subscriptionTier: 'free',
+              createdAt: new Date(),
+              updatedAt: new Date()
             },
           });
           
-          console.log('✅ User upserted successfully');
+          console.log('✅ User upserted successfully:', {
+            id: upsertedUser.id,
+            email: upsertedUser.email,
+            name: upsertedUser.name
+          });
           return true;
         } catch (error) {
           console.error('❌ Error upserting user:', error);
+          console.error('❌ Error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            code: (error as any)?.code || 'UNKNOWN',
+            meta: (error as any)?.meta || 'No metadata'
+          });
           // Still allow sign in even if database fails
           return true;
         }
