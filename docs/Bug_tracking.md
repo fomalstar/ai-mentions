@@ -205,32 +205,73 @@
 
 ---
 
-### Issue #010: Topic Data Corruption
+### Issue #010: Topic Data Corruption (CRITICAL)
 **Date:** 2025-01-31  
-**Severity:** High  
+**Severity:** Critical  
 **Status:** 🔴 OPEN
 
 **Description:**
-- User enters "give me a list of search engines" in UI
-- Database/API receives corrupted topic like "ergerg"
-- Topic data not properly passed from dashboard to backend
+- User enters "how to make icecream" in UI
+- Database stores corrupted topics: "erge", "gre", "ewgerg", "ergerg"
+- This explains why position detection is wrong (searching for "Yandex" in "how to make icecream" topics)
 
 **Root Cause:**
-- **INVESTIGATION NEEDED**: Topic mapping between UI and database
-- Possible form handling issue in dashboard
-- May be related to project creation or editing workflow
+- **CONFIRMED**: Data corruption in database storage/retrieval
+- KeywordTracking table has corrupted topic field values
+- Project creation/editing not preserving topic integrity
+
+**Impact:**
+- All position analysis is meaningless with wrong topics
+- AI scans search for brand in unrelated topics
+- User experience completely broken
 
 **Resolution:**
-- **IN PROGRESS**: Need to trace topic data flow
-- Check form submission in dashboard
-- Verify database storage and retrieval
+- **URGENT**: Fix topic field corruption in KeywordTracking table
+- Trace data flow from UI form submission to database storage
+- Add data validation and integrity checks
 
 **Files Modified:**
-- **PENDING**: Investigation required
+- **PENDING**: Full investigation required
 
-**Prevention:**
-- Add topic validation in form submission
-- Implement data integrity checks
+### Issue #011: Wrong Position Detection Logic (CRITICAL)
+**Date:** 2025-01-31  
+**Severity:** Critical  
+**Status:** 🔴 OPEN
+
+**Description:**
+- Position detection counts sentences instead of ranking positions
+- Looking for "Yandex" in "how to make icecream" topic returns false positions
+- Should return null/not found for irrelevant topics
+
+**Root Cause:**
+- Position logic counts sentence appearance (position = i + 1)
+- Should detect ranking positions in lists (1st, 2nd, 3rd place)
+- No logic to return null for irrelevant brand mentions
+
+**Resolution:**
+- **URGENT**: Rewrite position detection for ranked lists
+- Add irrelevance detection (brand not relevant to topic)
+- Return null when brand shouldn't be mentioned in topic
+
+### Issue #012: URL Extraction Returning example.com (CRITICAL)
+**Date:** 2025-01-31  
+**Severity:** Critical  
+**Status:** 🔴 OPEN
+
+**Description:**
+- ChatGPT follow-up returns "📌 Extracted 0 source URLs"
+- Data Sources showing example.com/@https://example.com/ai-response-0
+- No real URLs being extracted despite follow-up queries
+
+**Root Cause:**
+- URL extraction regex not finding URLs in AI responses
+- Follow-up queries not returning URLs in expected format
+- Fallback to dummy URLs when extraction fails
+
+**Resolution:**
+- **URGENT**: Debug URL extraction regex and follow-up query responses
+- Log actual AI responses to see URL format
+- Fix extraction or improve follow-up query prompts
 
 ---
 

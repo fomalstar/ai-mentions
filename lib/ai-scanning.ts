@@ -344,7 +344,7 @@ export class AIScanningService {
   }
 
   /**
-   * Analyze brand mention in AI response
+   * Analyze brand mention in AI response for RANKING POSITION
    */
   private analyzeBrandMention(responseText: string, brandName: string): {
     brandMentioned: boolean
@@ -364,18 +364,64 @@ export class AIScanningService {
       return { brandMentioned: false, position: null, confidence: 0, context: null }
     }
 
-    // Find position of brand mention
-    const sentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 0)
+    // Look for RANKING PATTERNS (not just sentence appearance)
     let position: number | null = null
     let context: string | null = null
     
-    for (let i = 0; i < sentences.length; i++) {
-      const sentence = sentences[i]
-      if (sentence.toLowerCase().includes(normalizedBrand)) {
-        position = i + 1
-        context = sentence.trim()
-        break
+    // Pattern 1: Numbered lists "1. Google, 2. Bing, 3. Yandex"
+    const numberedPattern = new RegExp(`(\\d+)\\s*[.):]\\s*[^\\d]*?\\b${normalizedBrand}\\b`, 'i')
+    const numberedMatch = responseText.match(numberedPattern)
+    if (numberedMatch) {
+      position = parseInt(numberedMatch[1])
+      context = numberedMatch[0]
+    }
+    
+    // Pattern 2: Ordinal lists "first Google, second Bing, third Yandex"  
+    if (!position) {
+      const ordinalPattern = new RegExp(`(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)[^.]*?\\b${normalizedBrand}\\b`, 'i')
+      const ordinalMatch = responseText.match(ordinalPattern)
+      if (ordinalMatch) {
+        const ordinals = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 }
+        position = ordinals[ordinalMatch[1].toLowerCase() as keyof typeof ordinals] || null
+        context = ordinalMatch[0]
       }
+    }
+    
+    // Pattern 3: Position in comma-separated lists "Google, Bing, Yandex, DuckDuckGo"
+    if (!position) {
+      const lines = responseText.split(/[.!?\n]+/)
+      for (const line of lines) {
+        if (line.toLowerCase().includes(normalizedBrand)) {
+          // Split by commas and find position
+          const items = line.split(',').map(item => item.trim())
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].toLowerCase().includes(normalizedBrand)) {
+              position = i + 1
+              context = line.trim()
+              break
+            }
+          }
+          if (position) break
+        }
+      }
+    }
+    
+    // If still no position, brand mentioned but not in ranking context
+    if (!position) {
+      // Find the sentence with brand mention for context
+      const sentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 0)
+      for (const sentence of sentences) {
+        if (sentence.toLowerCase().includes(normalizedBrand)) {
+          context = sentence.trim()
+          break
+        }
+      }
+      position = null  // Not in ranking context
+    }
+    
+    // Cap position at 10 (only track top 10 positions)
+    if (position && position > 10) {
+      position = null  // Beyond trackable range
     }
     
     // Calculate confidence based on context
@@ -421,27 +467,67 @@ export class AIScanningService {
    * Extract URLs from text
    */
   private extractUrlsFromText(text: string): Array<{ url: string, domain: string, title: string, date?: string }> {
-    const urlRegex = /https?:\/\/([^\s]+)/g
-    const urls: Array<{ url: string, domain: string, title: string, date?: string }> = []
+    console.log(`🔍 Extracting URLs from text (${text.length} chars):`, text.substring(0, 200) + '...')
     
-    let match
-    while ((match = urlRegex.exec(text)) !== null) {
-      try {
-        const url = match[0]
-        const domain = new URL(url).hostname
-        const title = this.extractTitleFromUrl(url, text)
-        
-        urls.push({
-          url,
-          domain,
-          title: title || `Content from ${domain}`,
-          date: new Date().toISOString().split('T')[0]
-        })
-      } catch (error) {
-        console.warn(`⚠️ Failed to parse URL: ${match[0]}`, error)
+    // Enhanced URL regex patterns
+    const urlPatterns = [
+      /https?:\/\/[^\s<>"{}|\\^`[\]]+/g,  // Standard URLs
+      /www\.[^\s<>"{}|\\^`[\]]+/g,       // www.domain.com
+      /[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.([a-zA-Z]{2,})/g  // domain.com
+    ]
+    
+    const urls: Array<{ url: string, domain: string, title: string, date?: string }> = []
+    const foundUrls = new Set<string>() // Avoid duplicates
+    
+    for (const pattern of urlPatterns) {
+      let match
+      while ((match = pattern.exec(text)) !== null) {
+        try {
+          let url = match[0]
+          
+          // Clean up URL
+          url = url.replace(/[.,;!?]+$/, '') // Remove trailing punctuation
+          
+          // Add protocol if missing
+          if (!url.startsWith('http') && !url.startsWith('www')) {
+            if (url.includes('.')) {
+              url = 'https://' + url
+            } else {
+              continue // Skip invalid domains
+            }
+          } else if (url.startsWith('www')) {
+            url = 'https://' + url
+          }
+          
+          // Skip if already found
+          if (foundUrls.has(url)) continue
+          foundUrls.add(url)
+          
+          const domain = new URL(url).hostname
+          
+          // Skip common unwanted domains
+          if (domain.includes('example.com') || domain.includes('localhost')) {
+            continue
+          }
+          
+          const title = this.extractTitleFromUrl(url, text)
+          
+          urls.push({
+            url,
+            domain,
+            title: title || `Content from ${domain}`,
+            date: new Date().toISOString().split('T')[0]
+          })
+          
+          console.log(`📌 Found URL: ${url} (${domain})`)
+          
+        } catch (error) {
+          console.warn(`⚠️ Failed to parse URL: ${match[0]}`, error)
+        }
       }
     }
     
+    console.log(`✅ Extracted ${urls.length} valid URLs`)
     return urls
   }
 
