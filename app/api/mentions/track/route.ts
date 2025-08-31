@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    console.log('🚀 Track route called')
+    
+    const session = await getServerSession(authOptions)
+    console.log('🔐 Session check:', { hasSession: !!session, userId: session?.user?.id })
     
     if (!session?.user?.id) {
+      console.log('❌ No valid session found')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    console.log('✅ User authenticated:', session.user.id)
 
     const { brandName, keywords, topics, competitors } = await request.json()
     

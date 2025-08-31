@@ -824,7 +824,7 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          displayName: newProject.brandName,
+          brandName: newProject.brandName,
           description: newProject.description,
           website: newProject.website,
           keywords: [newProject.name], // Use project name as initial keyword
@@ -962,7 +962,7 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          displayName: project.brandName,
+          brandName: project.brandName,
           keywords: [keywordResults.keyword],
           topics: [topic.question]
         })
