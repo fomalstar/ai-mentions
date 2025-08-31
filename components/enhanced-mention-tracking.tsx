@@ -106,36 +106,34 @@ export function EnhancedMentionTracking() {
       })
 
       if (response.ok) {
-        const data = await response.json()
-        toast.success(immediate ? 'Scan completed successfully!' : 'Scan scheduled successfully!')
-        
-        if (immediate) {
-          // Show real progress for immediate scan
-          setScanProgress(25)
-          await new Promise(resolve => setTimeout(resolve, 500))
-          setScanProgress(50)
-          await new Promise(resolve => setTimeout(resolve, 500))
-          setScanProgress(75)
-          await new Promise(resolve => setTimeout(resolve, 500))
-          setScanProgress(100)
-        }
-        
-        // Refresh data after a short delay to allow processing
-        setTimeout(() => {
-          loadData()
-        }, 1000)
+        toast.success('Scan started successfully!')
+        // Start progress simulation
+        let progress = 0
+        const interval = setInterval(() => {
+          progress += Math.random() * 15
+          if (progress >= 100) {
+            progress = 100
+            clearInterval(interval)
+            setTimeout(() => {
+              setIsScanning(false)
+              setScanProgress(0)
+              setSelectedBrand(null)
+              loadData()
+            }, 1000)
+          }
+          setScanProgress(Math.round(progress))
+        }, 500)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to start scan')
-      }
-    } catch (error) {
-      console.error('Scan error:', error)
-      toast.error('Failed to start scan')
-    } finally {
-      setTimeout(() => {
         setIsScanning(false)
         setScanProgress(0)
-      }, 1000)
+      }
+    } catch (error) {
+      console.error('Start scan error:', error)
+      toast.error('Failed to start scan')
+      setIsScanning(false)
+      setScanProgress(0)
     }
   }
 
@@ -306,47 +304,48 @@ export function EnhancedMentionTracking() {
                 Add Brand
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Brand</DialogTitle>
-              <DialogDescription>
-                Start tracking mentions for a new brand across AI platforms
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="brandName">Brand Name</Label>
-                <Input
-                  id="brandName"
-                  value={newBrand.name}
-                  onChange={(e) => setNewBrand(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., MyBrand"
-                />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Brand</DialogTitle>
+                <DialogDescription>
+                  Start tracking mentions for a new brand across AI platforms
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="brandName">Brand Name</Label>
+                  <Input
+                    id="brandName"
+                    value={newBrand.name}
+                    onChange={(e) => setNewBrand(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., MyBrand"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="website">Website (Optional)</Label>
+                  <Input
+                    id="website"
+                    value={newBrand.website}
+                    onChange={(e) => setNewBrand(prev => ({ ...prev, website: e.target.value }))}
+                    placeholder="e.g., https://mybrand.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="keywords">Keywords (comma separated)</Label>
+                  <Input
+                    id="keywords"
+                    value={newBrand.keywords}
+                    onChange={(e) => setNewBrand(prev => ({ ...prev, keywords: e.target.value }))}
+                    placeholder="e.g., project management, productivity tools"
+                  />
+                </div>
+                <Button onClick={addNewBrand} className="w-full">
+                  Add Brand
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="website">Website (Optional)</Label>
-                <Input
-                  id="website"
-                  value={newBrand.website}
-                  onChange={(e) => setNewBrand(prev => ({ ...prev, website: e.target.value }))}
-                  placeholder="e.g., https://mybrand.com"
-                />
-              </div>
-              <div>
-                <Label htmlFor="keywords">Keywords (comma separated)</Label>
-                <Input
-                  id="keywords"
-                  value={newBrand.keywords}
-                  onChange={(e) => setNewBrand(prev => ({ ...prev, keywords: e.target.value }))}
-                  placeholder="e.g., project management, productivity tools"
-                />
-              </div>
-              <Button onClick={addNewBrand} className="w-full">
-                Add Brand
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -404,34 +403,23 @@ export function EnhancedMentionTracking() {
                         startScan(brand.id, true)
                       }}
                       disabled={isScanning}
-                      className="bg-red-500 hover:bg-red-600 text-white border-red-500"
                     >
                       {isScanning && selectedBrand === brand.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Play className="w-4 h-4" />
                       )}
-                      Run Scan
+                      {isScanning && selectedBrand === brand.id ? 'Scanning...' : 'Run Scan'}
                     </Button>
-                    {brand.scanningEnabled ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => stopScanning(brand.id)}
-                      >
-                        <Square className="w-4 h-4" />
-                        Stop
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startScan(brand.id, false)}
-                      >
-                        <Play className="w-4 h-4" />
-                        Resume
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stopScanning(brand.id)}
+                      disabled={!isScanning || selectedBrand !== brand.id}
+                    >
+                      <Square className="w-4 h-4" />
+                      Stop
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -441,69 +429,30 @@ export function EnhancedMentionTracking() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Keyword</TableHead>
-                        <TableHead>Avg. Position</TableHead>
-                        <TableHead>Change</TableHead>
+                        <TableHead>Topic</TableHead>
+                        <TableHead>Avg Position</TableHead>
                         <TableHead>ChatGPT</TableHead>
                         <TableHead>Perplexity</TableHead>
                         <TableHead>Gemini</TableHead>
+                        <TableHead>Change</TableHead>
                         <TableHead>Last Scan</TableHead>
-                        <TableHead>Scans</TableHead>
+                        <TableHead>Scan Count</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {brand.keywords.map((keyword) => (
                         <TableRow key={keyword.id}>
                           <TableCell className="font-medium">{keyword.keyword}</TableCell>
-                          <TableCell>
-                            {keyword.avgPosition ? (
-                              <Badge variant="outline">#{keyword.avgPosition.toFixed(1)}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
+                          <TableCell className="max-w-xs truncate">{keyword.topic}</TableCell>
+                          <TableCell>{formatPosition(keyword.avgPosition)}</TableCell>
+                          <TableCell>{formatPosition(keyword.chatgptPosition)}</TableCell>
+                          <TableCell>{formatPosition(keyword.perplexityPosition)}</TableCell>
+                          <TableCell>{formatPosition(keyword.geminiPosition)}</TableCell>
                           <TableCell>{formatChange(keyword.positionChange)}</TableCell>
                           <TableCell>
-                            {isScanning && selectedBrand === brand.id ? (
-                              <div className="flex items-center gap-2">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span className="text-xs text-muted-foreground">Scanning...</span>
-                              </div>
-                            ) : (
-                              formatPosition(keyword.chatgptPosition)
-                            )}
+                            {keyword.lastScanAt ? new Date(keyword.lastScanAt).toLocaleDateString() : '-'}
                           </TableCell>
-                          <TableCell>
-                            {isScanning && selectedBrand === brand.id ? (
-                              <div className="flex items-center gap-2">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span className="text-xs text-muted-foreground">Scanning...</span>
-                              </div>
-                            ) : (
-                              formatPosition(keyword.perplexityPosition)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isScanning && selectedBrand === brand.id ? (
-                              <div className="flex items-center gap-2">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span className="text-xs text-muted-foreground">Scanning...</span>
-                              </div>
-                            ) : (
-                              formatPosition(keyword.geminiPosition)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {keyword.lastScanAt ? (
-                              <span className="text-sm text-muted-foreground">
-                                {new Date(keyword.lastScanAt).toLocaleDateString()}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">Never</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{keyword.scanCount}</Badge>
-                          </TableCell>
+                          <TableCell>{keyword.scanCount}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
