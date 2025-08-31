@@ -56,55 +56,74 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    console.log('🔄 Creating/updating brand tracking for:', { userId: session.user.id, brandName, keywords, topics })
+    
     // Create or update brand tracking
-    const tracking = await prisma.brandTracking.upsert({
-      where: { 
-        userId_brandName: {
-          userId: session.user.id,
-          brandName: brandName.toLowerCase()
-        }
-      },
-      update: {
-        keywords,
-        competitors: competitors || [],
-        isActive: true,
-        updatedAt: new Date()
-      },
-      create: {
-        userId: session.user.id,
-        brandName: brandName.toLowerCase(),
-        displayName: brandName,
-        keywords,
-        competitors: competitors || [],
-        isActive: true
-      }
-    })
-
-    // Create tracking keywords with topics
-    for (let i = 0; i < keywords.length; i++) {
-      const keyword = keywords[i]
-      const topic = topics[i]
-      
-      await prisma.keywordTracking.upsert({
-        where: {
-          brandTrackingId_keyword: {
-            brandTrackingId: tracking.id,
-            keyword: keyword.toLowerCase()
+    let tracking
+    try {
+      tracking = await prisma.brandTracking.upsert({
+        where: { 
+          userId_brandName: {
+            userId: session.user.id,
+            brandName: brandName.toLowerCase()
           }
         },
         update: {
-          topic: topic,
+          keywords,
+          competitors: competitors || [],
           isActive: true,
           updatedAt: new Date()
         },
         create: {
           userId: session.user.id,
-          brandTrackingId: tracking.id,
-          keyword: keyword.toLowerCase(),
-          topic: topic,
+          brandName: brandName.toLowerCase(),
+          displayName: brandName,
+          keywords,
+          competitors: competitors || [],
           isActive: true
         }
       })
+      
+      console.log('✅ Brand tracking created/updated:', tracking.id)
+    } catch (upsertError) {
+      console.error('❌ Brand tracking upsert failed:', upsertError)
+      throw new Error(`Failed to create/update brand tracking: ${upsertError instanceof Error ? upsertError.message : 'Unknown error'}`)
+    }
+
+    // Create tracking keywords with topics
+    console.log('🔄 Creating keyword tracking entries...')
+    
+    for (let i = 0; i < keywords.length; i++) {
+      const keyword = keywords[i]
+      const topic = topics[i]
+      
+      try {
+        await prisma.keywordTracking.upsert({
+          where: {
+            brandTrackingId_keyword: {
+              brandTrackingId: tracking.id,
+              keyword: keyword.toLowerCase()
+            }
+          },
+          update: {
+            topic: topic,
+            isActive: true,
+            updatedAt: new Date()
+          },
+          create: {
+            userId: session.user.id,
+            brandTrackingId: tracking.id,
+            keyword: keyword.toLowerCase(),
+            topic: topic,
+            isActive: true
+          }
+        })
+        
+        console.log(`✅ Keyword tracking created for: ${keyword}`)
+      } catch (keywordError) {
+        console.error(`❌ Failed to create keyword tracking for ${keyword}:`, keywordError)
+        throw new Error(`Failed to create keyword tracking: ${keywordError instanceof Error ? keywordError.message : 'Unknown error'}`)
+      }
     }
 
     return NextResponse.json({
