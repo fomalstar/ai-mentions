@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get brand tracking details
+
     let brandTracking
     try {
       // First check if the database tables exist by testing a simple query
