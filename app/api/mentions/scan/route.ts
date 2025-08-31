@@ -6,15 +6,22 @@ import { aiScanningService } from '@/lib/ai-scanning'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Scan route called with request')
+    
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.id) {
+      console.log('❌ No session found')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    console.log(`✅ User authenticated: ${session.user.id}`)
 
     const { brandTrackingId, keywordTrackingId, immediate = false } = await request.json()
+    console.log(`📋 Request data:`, { brandTrackingId, keywordTrackingId, immediate })
     
     if (!brandTrackingId) {
+      console.log('❌ No brandTrackingId provided')
       return NextResponse.json({ error: 'Brand tracking ID is required' }, { status: 400 })
     }
 
@@ -55,7 +62,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!brandTracking) {
-      return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
+      return NextResponse.json({ 
+        error: 'Brand tracking not found',
+        details: `No brand tracking found with ID: ${brandTrackingId}`,
+        suggestion: 'Create a brand tracking entry first'
+      }, { status: 404 })
+    }
+    
+    // Check if keywordTracking table exists and has data
+    if (!brandTracking.keywordTracking || brandTracking.keywordTracking.length === 0) {
+      return NextResponse.json({ 
+        error: 'No keywords/topics to scan',
+        details: 'This brand has no keywords or topics configured for scanning',
+        suggestion: 'Add keywords and topics to your brand tracking first'
+      }, { status: 400 })
     }
 
     if (immediate) {
