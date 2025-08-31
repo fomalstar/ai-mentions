@@ -129,8 +129,8 @@ export default function Dashboard() {
   // Prevent hydration mismatch
   useEffect(() => {
     setIsClient(true)
-    // Load demo data
-    loadDemoData()
+    // Load projects from database instead of demo data
+    loadProjectsFromDatabase()
     // Load mention results
     loadMentionResults()
     // Load data sources
@@ -697,6 +697,85 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error loading mention results:', error)
       setMentionResults([])
+    }
+  }
+
+  const loadProjectsFromDatabase = async () => {
+    try {
+      console.log('🔄 Loading projects from database...')
+      
+      // Load existing projects from the database
+      const response = await fetch('/api/mentions/status')
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (data.brandTracking && Array.isArray(data.brandTracking)) {
+          // Convert database projects to Project format
+          const dbProjects: Project[] = data.brandTracking.map((tracking: any) => ({
+            id: tracking.id,
+            name: tracking.displayName,
+            brandName: tracking.displayName,
+            website: tracking.website || '',
+            description: tracking.description || '',
+            createdAt: new Date(tracking.createdAt).toISOString(),
+            status: tracking.isActive ? 'active' : 'paused',
+            keywordsTracked: tracking.keywordTracking?.length || 0,
+            mentionsFound: tracking.totalMentions || 0,
+            lastActivity: new Date(tracking.updatedAt).toISOString()
+          }))
+          
+          console.log(`✅ Loaded ${dbProjects.length} projects from database`)
+          setProjects(dbProjects)
+          
+          // Calculate stats from loaded projects
+          const totalProjects = dbProjects.length
+          const activeKeywords = data.brandTracking.reduce((sum: number, tracking: any) => 
+            sum + (tracking.keywordTracking?.length || 0), 0
+          )
+          const totalMentions = dbProjects.reduce((sum, project) => sum + project.mentionsFound, 0)
+          const thisMonthMentions = 0 // We'll calculate this later when we have time-based data
+          
+          setStats({
+            totalProjects,
+            activeKeywords,
+            totalMentions,
+            thisMonthMentions,
+            growthRate: 0
+          })
+        } else {
+          console.log('ℹ️ No projects found in database, starting with empty list')
+          setProjects([])
+          setStats({
+            totalProjects: 0,
+            activeKeywords: 0,
+            totalMentions: 0,
+            thisMonthMentions: 0,
+            growthRate: 0
+          })
+        }
+      } else {
+        console.error('❌ Failed to load projects from database')
+        // Fallback to empty projects
+        setProjects([])
+        setStats({
+          totalProjects: 0,
+          activeKeywords: 0,
+          totalMentions: 0,
+          thisMonthMentions: 0,
+          growthRate: 0
+        })
+      }
+    } catch (error) {
+      console.error('❌ Error loading projects:', error)
+      // Fallback to empty projects
+      setProjects([])
+      setStats({
+        totalProjects: 0,
+        activeKeywords: 0,
+        totalMentions: 0,
+        thisMonthMentions: 0,
+        growthRate: 0
+      })
     }
   }
 

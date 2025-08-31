@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
     // Get brand tracking details
     let brandTracking
     try {
+      // First check if the database tables exist by testing a simple query
+      await prisma.$queryRaw`SELECT 1`
+      console.log('✅ Database connection test passed')
+      
       brandTracking = await prisma.brandTracking.findFirst({
         where: {
           id: brandTrackingId,
@@ -33,7 +37,17 @@ export async function POST(request: NextRequest) {
         }
       })
     } catch (dbError) {
-      console.error('❌ Database connection error:', dbError)
+      console.error('❌ Database error:', dbError)
+      
+      // Check if it's a table not found error
+      if (dbError instanceof Error && dbError.message.includes('relation') && dbError.message.includes('does not exist')) {
+        return NextResponse.json({ 
+          error: 'Database tables not found. Please run database migrations first.',
+          details: 'The required database tables have not been created yet.',
+          suggestion: 'Run: pnpm run db:deploy or check your database setup'
+        }, { status: 500 })
+      }
+      
       return NextResponse.json({ 
         error: 'Database connection failed',
         details: dbError instanceof Error ? dbError.message : 'Unknown database error'
@@ -134,8 +148,16 @@ export async function POST(request: NextRequest) {
           })
           queueItems.push(queueItem)
         }
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Scan scheduled successfully',
+          queueItems: queueItems.length,
+          scheduledAt: new Date().toISOString()
+        })
+        
       } catch (error) {
-        console.warn('ScanQueue table not available yet:', error.message)
+        console.warn('ScanQueue table not available yet:', error instanceof Error ? error.message : 'Unknown error')
         // For now, just return success without queueing
         return NextResponse.json({
           success: true,
@@ -143,13 +165,6 @@ export async function POST(request: NextRequest) {
           results: []
         })
       }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Scan scheduled successfully',
-        queueItems: queueItems.length,
-        scheduledAt: new Date().toISOString()
-      })
     }
 
   } catch (error) {
