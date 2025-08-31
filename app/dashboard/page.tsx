@@ -442,110 +442,95 @@ export default function Dashboard() {
       let totalMentions = 0
       const platforms = ['chatgpt', 'perplexity', 'gemini']
       
-      // Scan each topic for this project
+      // Scan each topic for this project using REAL AI scanning
       for (const trackingItem of trackingItems) {
         console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
         
-        for (const platform of platforms) {
-          try {
-            // Simulate AI query for brand position
-            await new Promise(resolve => setTimeout(resolve, 800))
+        try {
+          // Call the real AI scanning API
+          const scanResponse = await fetch('/api/mentions/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              brandTrackingId: projectId, 
+              immediate: true 
+            })
+          })
+          
+          if (scanResponse.ok) {
+            const scanData = await scanResponse.json()
+            console.log(`✅ Scan completed for ${project.name} - ${trackingItem.topic}`)
             
-            // Simulate finding brand mention (70% chance)
-            const hasMention = Math.random() > 0.3
-            let position: number | null = null
-            let mentionType: 'positive' | 'negative' | 'neutral' = 'neutral'
-            
-            if (hasMention) {
-              position = Math.floor(Math.random() * 5) + 1
-              mentionType = Math.random() > 0.7 ? 'positive' : 'neutral'
-              totalMentions++
-              
-              // Create mention result
-              const mentionResult = {
-                id: Date.now().toString() + Math.random(),
-                projectId,
-                projectName: project.name,
-                brandName: project.brandName,
-                keyword: trackingItem.keyword,
-                topic: trackingItem.topic,
-                aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
-                hasMention: true,
-                mentionType,
-                detectedAt: new Date().toISOString(),
-                source: platform,
-                content: `Found mention of ${project.brandName} in ${platform} response about "${trackingItem.topic}"`,
-                position,
-                platform
-              }
-              
-              // Add to mention results
-              setMentionResults(prev => [mentionResult, ...prev])
-              
-              // Update localStorage
-              const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-              const updatedResults = [mentionResult, ...existingResults]
-              localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
-              
-              // Simulate getting source URLs
-              await new Promise(resolve => setTimeout(resolve, 500))
-              
-              // Create realistic simulated source URLs based on platform and topic
-              const sourceUrls = [
-                {
-                  id: `source-${Date.now()}-${Math.random()}`,
-                  url: `https://${getRealisticDomain(platform)}/article/${generateSlug(trackingItem.topic)}`,
-                  domain: getRealisticDomain(platform),
-                  title: getRealisticTitle(platform, trackingItem.topic, trackingItem.keyword),
-                  date: new Date().toISOString(),
-                  keyword: trackingItem.keyword,
-                  platform
+            // Process real scan results
+            if (scanData.results && Array.isArray(scanData.results)) {
+              for (const result of scanData.results) {
+                if (result.results && Array.isArray(result.results)) {
+                  for (const platformResult of result.results) {
+                    if (platformResult.brandMentioned) {
+                      totalMentions++
+                      
+                      // Create real mention result from AI scanning
+                      const mentionResult = {
+                        id: Date.now().toString() + Math.random(),
+                        projectId,
+                        projectName: project.name,
+                        brandName: project.brandName,
+                        keyword: trackingItem.keyword,
+                        topic: trackingItem.topic,
+                        aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
+                        hasMention: true,
+                        mentionType: 'positive', // AI found the mention
+                        detectedAt: new Date().toISOString(),
+                        source: platformResult.platform,
+                        content: `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`,
+                        position: platformResult.position,
+                        platform: platformResult.platform
+                      }
+                      
+                      // Add to mention results
+                      setMentionResults(prev => [mentionResult, ...prev])
+                      
+                      // Update localStorage
+                      const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                      const updatedResults = [mentionResult, ...existingResults]
+                      localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+                      
+                      // Process real source URLs from AI scanning
+                      if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                        const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
+                          id: `source-${Date.now()}-${Math.random()}`,
+                          url: urlData.url,
+                          domain: urlData.domain,
+                          title: urlData.title,
+                          date: urlData.date || new Date().toISOString(),
+                          keyword: trackingItem.keyword,
+                          platform: platformResult.platform
+                        }))
+                        
+                        // Add to data sources
+                        setDataSources(prev => [...sourceUrls, ...prev])
+                      }
+                    }
+                  }
                 }
-              ]
-              
-              // Add to data sources
-              setDataSources(prev => [...sourceUrls, ...prev])
-              
-            } else {
-              // No mention found
-              const noMentionResult = {
-                id: Date.now().toString() + Math.random(),
-                projectId,
-                projectName: project.name,
-                brandName: project.brandName,
-                keyword: trackingItem.keyword,
-                topic: trackingItem.topic,
-                aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
-                hasMention: false,
-                mentionType: 'neutral',
-                detectedAt: new Date().toISOString(),
-                source: platform,
-                content: `No mention of ${project.brandName} found in ${platform} response`,
-                position: null,
-                platform
               }
-              
-              // Add to mention results (for tracking purposes)
-              setMentionResults(prev => [noMentionResult, ...prev])
-              
-              // Update localStorage
-              const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-              const updatedResults = [noMentionResult, ...existingResults]
-              localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
             }
-            
-          } catch (error) {
-            console.error(`Error scanning ${platform} for topic ${trackingItem.topic}:`, error)
+          } else {
+            const errorData = await scanResponse.json()
+            console.error(`❌ Scan failed for ${project.name}:`, errorData)
+            toast.error(`Scan failed for ${project.name}: ${errorData.error || 'Unknown error'}`)
           }
+          
+          // Add delay between scans to avoid overwhelming the system
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+        } catch (scanError) {
+          console.error(`❌ Error scanning ${project.name} - ${trackingItem.topic}:`, scanError)
+          toast.error(`Failed to scan ${project.name}: ${trackingItem.topic}`)
         }
       }
       
-      // Show completion message
-      if (totalMentions > 0) {
-        toast.success(`AI scan completed! Found ${totalMentions} brand mentions across all platforms`)
-      } else {
-        toast.info('AI scan completed. No brand mentions found this time.')
-      }
+      toast.success(`AI scanning completed! Found ${totalMentions} mentions across all projects.`)
       
       // Refresh data sources
       setTimeout(fetchDataSources, 1000)
@@ -585,7 +570,6 @@ export default function Dashboard() {
       }, {})
       
       let totalMentions = 0
-      const platforms = ['chatgpt', 'perplexity', 'gemini']
       
       // Add all projects to scanning set
       const projectIds = Object.keys(trackingByProject)
@@ -598,101 +582,91 @@ export default function Dashboard() {
         
         console.log(`Scanning project: ${project.name} with ${(trackingItems as any[]).length} topics`)
         
-        // Scan each topic for this project
+        // Scan each topic for this project using REAL AI scanning
         for (const trackingItem of trackingItems as any[]) {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
-          for (const platform of platforms) {
-            try {
-              // Simulate AI query for brand position
-              await new Promise(resolve => setTimeout(resolve, 600))
+          try {
+            // Call the real AI scanning API
+            const scanResponse = await fetch('/api/mentions/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                brandTrackingId: projectId, 
+                immediate: true 
+              })
+            })
+            
+            if (scanResponse.ok) {
+              const scanData = await scanResponse.json()
+              console.log(`✅ Scan completed for ${project.name} - ${trackingItem.topic}`)
               
-              // Simulate finding brand mention (70% chance)
-              const hasMention = Math.random() > 0.3
-              let position = null
-              let mentionType = 'neutral'
-              
-              if (hasMention) {
-                position = Math.floor(Math.random() * 5) + 1
-                mentionType = Math.random() > 0.7 ? 'positive' : 'neutral'
-                totalMentions++
-                
-                // Create mention result
-                const mentionResult = {
-                  id: Date.now().toString() + Math.random(),
-                  projectId,
-                  projectName: project.name,
-                  brandName: project.brandName,
-                  keyword: trackingItem.keyword,
-                  topic: trackingItem.topic,
-                  aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
-                  hasMention: true,
-                  mentionType,
-                  detectedAt: new Date().toISOString(),
-                  source: platform,
-                  content: `Found mention of ${project.brandName} in ${platform} response about "${trackingItem.topic}"`,
-                  position,
-                  platform
-                }
-                
-                // Add to mention results
-                setMentionResults(prev => [mentionResult, ...prev])
-                
-                // Update localStorage
-                const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-                const updatedResults = [mentionResult, ...existingResults]
-                localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
-                
-                // Simulate getting source URLs
-                await new Promise(resolve => setTimeout(resolve, 400))
-                
-                                // Create realistic simulated source URLs based on platform and topic
-                const sourceUrls = [
-                  {
-                    id: `source-${Date.now()}-${Math.random()}`,
-                    url: `https://${getRealisticDomain(platform)}/article/${generateSlug(trackingItem.topic)}`,
-                    domain: getRealisticDomain(platform),
-                    title: getRealisticTitle(platform, trackingItem.topic, trackingItem.keyword),
-                    date: new Date().toISOString(),
-                    keyword: trackingItem.keyword,
-                    platform
+              // Process real scan results
+              if (scanData.results && Array.isArray(scanData.results)) {
+                for (const result of scanData.results) {
+                  if (result.results && Array.isArray(result.results)) {
+                    for (const platformResult of result.results) {
+                      if (platformResult.brandMentioned) {
+                        totalMentions++
+                        
+                        // Create real mention result from AI scanning
+                        const mentionResult = {
+                          id: Date.now().toString() + Math.random(),
+                          projectId,
+                          projectName: project.name,
+                          brandName: project.brandName,
+                          keyword: trackingItem.keyword,
+                          topic: trackingItem.topic,
+                          aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
+                          hasMention: true,
+                          mentionType: 'positive', // AI found the mention
+                          detectedAt: new Date().toISOString(),
+                          source: platformResult.platform,
+                          content: `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`,
+                          position: platformResult.position,
+                          platform: platformResult.platform
+                        }
+                        
+                        // Add to mention results
+                        setMentionResults(prev => [mentionResult, ...prev])
+                        
+                        // Update localStorage
+                        const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                        const updatedResults = [mentionResult, ...existingResults]
+                        localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+                        
+                        // Process real source URLs from AI scanning
+                        if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                          const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
+                            id: `source-${Date.now()}-${Math.random()}`,
+                            url: urlData.url,
+                            domain: urlData.domain,
+                            title: urlData.title,
+                            date: urlData.date || new Date().toISOString(),
+                            keyword: trackingItem.keyword,
+                            platform: platformResult.platform
+                          }))
+                          
+                          // Add to data sources
+                          setDataSources(prev => [...sourceUrls, ...prev])
+                        }
+                      }
+                    }
                   }
-                ]
-                
-                // Add to data sources
-                setDataSources(prev => [...sourceUrls, ...prev])
-                
-              } else {
-                // No mention found
-                const noMentionResult = {
-                  id: Date.now().toString() + Math.random(),
-                  projectId,
-                  projectName: project.name,
-                  brandName: project.brandName,
-                  keyword: trackingItem.keyword,
-                  topic: trackingItem.topic,
-                  aiResponse: `AI response from ${platform} about ${trackingItem.topic}`,
-                  hasMention: false,
-                  mentionType: 'neutral',
-                  detectedAt: new Date().toISOString(),
-                  source: platform,
-                  content: `No mention of ${project.brandName} found in ${platform} response`,
-                  position: null,
-                  platform
                 }
-                
-                // Add to mention results (for tracking purposes)
-                setMentionResults(prev => [noMentionResult, ...prev])
-                
-                // Update localStorage
-                const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-                const updatedResults = [noMentionResult, ...existingResults]
-                localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
               }
-              
-            } catch (error) {
-              console.error(`Error scanning ${platform} for topic ${trackingItem.topic}:`, error)
+            } else {
+              const errorData = await scanResponse.json()
+              console.error(`❌ Scan failed for ${project.name}:`, errorData)
+              toast.error(`Scan failed for ${project.name}: ${errorData.error || 'Unknown error'}`)
             }
+            
+            // Add delay between scans to avoid overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            
+          } catch (scanError) {
+            console.error(`❌ Error scanning ${project.name} - ${trackingItem.topic}:`, scanError)
+            toast.error(`Failed to scan ${project.name}: ${trackingItem.topic}`)
           }
         }
       }
