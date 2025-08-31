@@ -746,11 +746,11 @@ export default function Dashboard() {
             brandName: tracking.displayName,
             website: tracking.website || '',
             description: tracking.description || '',
-            createdAt: new Date(tracking.createdAt).toISOString(),
+            createdAt: tracking.createdAt ? new Date(tracking.createdAt).toISOString() : new Date().toISOString(),
             status: tracking.isActive ? 'active' : 'paused',
             keywordsTracked: tracking.keywordTracking?.length || 0,
             mentionsFound: tracking.totalMentions || 0,
-            lastActivity: new Date(tracking.updatedAt).toISOString()
+            lastActivity: tracking.updatedAt ? new Date(tracking.updatedAt).toISOString() : new Date().toISOString()
           }))
           
           console.log(`✅ Loaded ${dbProjects.length} projects from database`)
@@ -793,7 +793,11 @@ export default function Dashboard() {
       console.error(`❌ Error loading projects from database (attempt ${retryCount + 1}):`, error)
       
       // Retry logic for cold starts
-      if (retryCount < 2 && (error.name === 'AbortError' || error.message.includes('fetch') || error.message.includes('HTTP'))) {
+      if (retryCount < 2 && (
+        (error as any)?.name === 'AbortError' || 
+        (error as Error)?.message?.includes('fetch') || 
+        (error as Error)?.message?.includes('HTTP')
+      )) {
         console.log(`🔄 Retrying in 3 seconds... (attempt ${retryCount + 2}/3)`)
         setTimeout(() => {
           loadProjectsFromDatabase(retryCount + 1)

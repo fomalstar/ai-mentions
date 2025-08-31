@@ -89,7 +89,16 @@ export async function GET(request: NextRequest) {
         }
       })
     } catch (error) {
-      console.warn('ScanQueue table not available yet:', error.message)
+      console.warn('ScanQueue table not available yet:', error instanceof Error ? error.message : 'Unknown error')
+      // If scan_queue table doesn't exist, try to create it
+      if (error instanceof Error && error.message.includes('does not exist')) {
+        console.log('🔧 Attempting to create scan_queue table...')
+        try {
+          await fetch(new URL('/api/create-scan-queue', request.url).toString())
+        } catch (createError) {
+          console.warn('Failed to auto-create scan_queue table:', createError)
+        }
+      }
     }
 
     // Get recent scan results for statistics
