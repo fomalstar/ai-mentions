@@ -55,13 +55,13 @@ export class AIScanningService {
       results.push(perplexityResult)
       console.log(`✅ Perplexity scan complete: ${perplexityResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${perplexityResult.position}`)
       
-      // Scan ChatGPT (mock for now, will implement with real API)
+      // Scan ChatGPT using OpenAI API
       console.log('📡 Scanning ChatGPT...')
       const chatgptResult = await this.scanChatGPT(request)
       results.push(chatgptResult)
       console.log(`✅ ChatGPT scan complete: ${chatgptResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${chatgptResult.position}`)
       
-      // Scan Gemini (mock for now, will implement with real API)
+      // Scan Gemini using Google Gemini API
       console.log('📡 Scanning Gemini...')
       const geminiResult = await this.scanGemini(request)
       results.push(geminiResult)
@@ -102,22 +102,29 @@ export class AIScanningService {
     
     try {
       // Step 1: Get initial response from Perplexity
+      console.log(`🔍 Perplexity Query: ${query}`)
       const initialResponse = await perplexityClient.getRealTimeInsights(query)
+      console.log(`📝 Perplexity Response: ${initialResponse.substring(0, 200)}...`)
       
       // Step 2: Analyze the response for brand mentions
       const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
+      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
       
       // Step 3: If brand is mentioned, ask for source URLs
       let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
       if (analysis.brandMentioned) {
-        const sourceQuery = `For the previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
+        console.log('🔗 Requesting source URLs from Perplexity...')
+        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
         try {
           const sourceResponse = await perplexityClient.getRealTimeInsights(sourceQuery)
+          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
           sourceUrls = this.extractSourceUrls(sourceResponse)
+          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
         } catch (sourceError) {
           console.warn('Failed to get source URLs from Perplexity:', sourceError)
           // Fallback to basic URL extraction from initial response
           sourceUrls = this.extractSourceUrls(initialResponse)
+          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
         }
       }
       
@@ -147,22 +154,29 @@ export class AIScanningService {
     
     try {
       // Step 1: Get initial response from ChatGPT
+      console.log(`🔍 ChatGPT Query: ${query}`)
       const initialResponse = await this.queryChatGPT(query)
+      console.log(`📝 ChatGPT Response: ${initialResponse.substring(0, 200)}...`)
       
       // Step 2: Analyze the response for brand mentions
       const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
+      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
       
       // Step 3: If brand is mentioned, ask for source URLs
       let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
       if (analysis.brandMentioned) {
+        console.log('🔗 Requesting source URLs from ChatGPT...')
         const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
         try {
           const sourceResponse = await this.queryChatGPT(sourceQuery)
+          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
           sourceUrls = this.extractSourceUrls(sourceResponse)
+          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
         } catch (sourceError) {
           console.warn('Failed to get source URLs from ChatGPT:', sourceError)
           // Fallback to basic URL extraction from initial response
           sourceUrls = this.extractSourceUrls(initialResponse)
+          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
         }
       }
       
@@ -192,22 +206,29 @@ export class AIScanningService {
     
     try {
       // Step 1: Get initial response from Gemini
+      console.log(`🔍 Gemini Query: ${query}`)
       const initialResponse = await this.queryGemini(query)
+      console.log(`📝 Gemini Response: ${initialResponse.substring(0, 200)}...`)
       
       // Step 2: Analyze the response for brand mentions
       const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
+      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
       
       // Step 3: If brand is mentioned, ask for source URLs
       let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
       if (analysis.brandMentioned) {
+        console.log('🔗 Requesting source URLs from Gemini...')
         const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
         try {
           const sourceResponse = await this.queryGemini(sourceQuery)
+          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
           sourceUrls = this.extractSourceUrls(sourceResponse)
+          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
         } catch (sourceError) {
           console.warn('Failed to get source URLs from Gemini:', sourceError)
           // Fallback to basic URL extraction from initial response
           sourceUrls = this.extractSourceUrls(initialResponse)
+          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
         }
       }
       
@@ -244,11 +265,15 @@ export class AIScanningService {
       })
       
       if (!response.ok) {
-        throw new Error(`ChatGPT API error: ${response.status}`)
+        const errorText = await response.text()
+        throw new Error(`ChatGPT API error: ${response.status} - ${errorText}`)
       }
       
       const data = await response.json()
-      return data.response || 'No response from ChatGPT'
+      if (!data.response) {
+        throw new Error('No response from ChatGPT API')
+      }
+      return data.response
     } catch (error) {
       console.error('ChatGPT query error:', error)
       throw error
@@ -271,11 +296,15 @@ export class AIScanningService {
       })
       
       if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
+        const errorText = await response.text()
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
       }
       
       const data = await response.json()
-      return data.response || 'No response from Gemini'
+      if (!data.response) {
+        throw new Error('No response from Gemini API')
+      }
+      return data.response
     } catch (error) {
       console.error('Gemini query error:', error)
       throw error
@@ -286,16 +315,25 @@ export class AIScanningService {
    * Build an effective query for AI platforms
    */
   private buildQuery(topic: string, brandName: string): string {
-    // Create a natural query that would trigger brand mentions
+    // Create specific queries for search engines and other topics
+    if (topic.toLowerCase().includes('search engine') || topic.toLowerCase().includes('search engines')) {
+      return `What are the best search engines available today? Please provide a comprehensive list with brief descriptions of each search engine's features and strengths.`
+    }
+    
+    if (topic.toLowerCase().includes('yandex')) {
+      return `Tell me about Yandex search engine. What are its features, how does it compare to other search engines, and what makes it unique?`
+    }
+    
+    // Generic queries for other topics
     const queries = [
-      `What are the best ${topic}?`,
-      `Compare different ${topic} options`,
-      `Which ${topic} would you recommend?`,
-      `Reviews of ${topic} tools`,
-      `Top ${topic} platforms for businesses`
+      `What are the best ${topic}? Please provide a comprehensive list with brief descriptions.`,
+      `Compare different ${topic} options and tell me which ones are most popular or recommended.`,
+      `Which ${topic} would you recommend for businesses? Please explain your reasoning.`,
+      `Give me reviews and comparisons of ${topic} tools and platforms.`,
+      `What are the top ${topic} platforms available today? Please rank them by popularity or effectiveness.`
     ]
     
-    // Select a random query or use the first one
+    // Select the most appropriate query based on the topic
     return queries[0]
   }
 
@@ -365,6 +403,19 @@ export class AIScanningService {
         if (i < 3) {
           return i + 1
         }
+        
+        // Check for bullet points or other list indicators
+        if (line.includes('•') || line.includes('-') || line.includes('*')) {
+          // Count previous list items to determine position
+          let listPosition = 1
+          for (let j = 0; j < i; j++) {
+            const prevLine = lines[j].toLowerCase()
+            if (prevLine.includes('•') || prevLine.includes('-') || prevLine.includes('*') || /^\s*\d+/.test(prevLine)) {
+              listPosition++
+            }
+          }
+          return listPosition
+        }
       }
     }
     
@@ -378,8 +429,8 @@ export class AIScanningService {
     let confidence = 0.5 // Base confidence
     
     // Higher confidence if brand is mentioned with positive words
-    const positiveWords = ['best', 'top', 'excellent', 'recommended', 'great', 'popular', 'leading']
-    const negativeWords = ['poor', 'bad', 'avoid', 'worst', 'terrible']
+    const positiveWords = ['best', 'top', 'excellent', 'recommended', 'great', 'popular', 'leading', 'powerful', 'innovative']
+    const negativeWords = ['poor', 'bad', 'avoid', 'worst', 'terrible', 'outdated', 'limited']
     
     const lowerContext = context.toLowerCase()
     
@@ -410,15 +461,17 @@ export class AIScanningService {
     const urlRegex = /https?:\/\/[^\s]+/g
     const urls = responseText.match(urlRegex) || []
     
+    console.log(`🔍 Found ${urls.length} URLs in response text`)
+    
     // Try to extract titles from the text around URLs
-    urls.forEach(url => {
+    urls.forEach((url, index) => {
       try {
         const domain = new URL(url).hostname
         
         // Look for title patterns around the URL
         const urlIndex = responseText.indexOf(url)
-        const beforeText = responseText.substring(Math.max(0, urlIndex - 100), urlIndex)
-        const afterText = responseText.substring(urlIndex + url.length, Math.min(responseText.length, urlIndex + url.length + 100))
+        const beforeText = responseText.substring(Math.max(0, urlIndex - 150), urlIndex)
+        const afterText = responseText.substring(urlIndex + url.length, Math.min(responseText.length, urlIndex + url.length + 150))
         
         // Try to find a title (look for quotes, dashes, or common patterns)
         let title = domain
@@ -440,12 +493,23 @@ export class AIScanningService {
           }
         }
         
+        // If no title found, try to extract from surrounding text
+        if (title === domain) {
+          const surroundingText = beforeText + ' ' + afterText
+          const words = surroundingText.split(/\s+/).filter(word => word.length > 3)
+          if (words.length > 0) {
+            title = words.slice(0, 3).join(' ') + '...'
+          }
+        }
+        
         sources.push({
           url,
           domain,
           title: title.length > 100 ? title.substring(0, 100) + '...' : title,
           date: new Date().toISOString()
         })
+        
+        console.log(`🔗 URL ${index + 1}: ${domain} - ${title}`)
       } catch (error) {
         console.warn('Failed to parse URL:', url, error)
       }
@@ -456,6 +520,7 @@ export class AIScanningService {
       index === self.findIndex(s => s.url === source.url)
     )
     
+    console.log(`✅ Extracted ${uniqueSources.length} unique source URLs`)
     return uniqueSources.slice(0, 10)
   }
 
@@ -498,150 +563,38 @@ export class AIScanningService {
         .filter(r => r.position !== null)
         .map(r => r.position as number)
       
-      const avgPosition = positions.length > 0 
-        ? positions.reduce((sum, pos) => sum + pos, 0) / positions.length 
-        : null
-
-      // Get current metrics for comparison
+      const avgPosition = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : null
+      
+      // Get current keyword tracking record
       const currentKeyword = await prisma.keywordTracking.findUnique({
         where: { id: keywordTrackingId }
       })
-
-      const previousAvgPosition = currentKeyword?.avgPosition
-      const positionChange = avgPosition && previousAvgPosition 
-        ? avgPosition - previousAvgPosition 
-        : null
-
-      // Update keyword tracking
-      await prisma.keywordTracking.update({
-        where: { id: keywordTrackingId },
-        data: {
-          avgPosition,
-          chatgptPosition: results.find(r => r.platform === 'chatgpt')?.position,
-          perplexityPosition: results.find(r => r.platform === 'perplexity')?.position,
-          geminiPosition: results.find(r => r.platform === 'gemini')?.position,
-          previousAvgPosition,
-          positionChange,
-          lastScanAt: new Date(),
-          scanCount: { increment: 1 }
-        }
-      })
+      
+      if (currentKeyword) {
+        // Calculate position change
+        const positionChange = currentKeyword.avgPosition && avgPosition 
+          ? currentKeyword.avgPosition - avgPosition 
+          : null
+        
+        // Update the record
+        await prisma.keywordTracking.update({
+          where: { id: keywordTrackingId },
+          data: {
+            avgPosition,
+            positionChange,
+            chatgptPosition: results.find(r => r.platform === 'chatgpt')?.position || null,
+            perplexityPosition: results.find(r => r.platform === 'perplexity')?.position || null,
+            geminiPosition: results.find(r => r.platform === 'gemini')?.position || null,
+            lastScanAt: new Date(),
+            scanCount: { increment: 1 }
+          }
+        })
+      }
     } catch (error) {
       console.error('Error updating keyword metrics:', error)
-    }
-  }
-
-  /**
-   * Create error result for failed scans
-   */
-  private createErrorResult(platform: 'chatgpt' | 'perplexity' | 'gemini', query: string, duration: number): ScanResult {
-    return {
-      platform,
-      query,
-      brandMentioned: false,
-      position: null,
-      responseText: 'Scan failed due to API error',
-      brandContext: null,
-      sourceUrls: [],
-      confidence: 0,
-      scanDuration: duration
-    }
-  }
-
-
-
-  /**
-   * Mock ChatGPT response for development
-   */
-  private async getMockChatGPTResponse(request: ScanRequest): Promise<{
-    text: string
-    sources: Array<{ url: string; domain: string; title: string; date?: string }>
-  }> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const shouldMention = Math.random() > 0.5
-    const position = shouldMention ? Math.floor(Math.random() * 5) + 1 : null
-    
-    let text = `Here are some top ${request.topic} options:\n\n`
-    
-    if (shouldMention && position) {
-      const competitors = ['Tool A', 'Platform B', 'Service C', 'App D', 'Solution E']
-      const options = [...competitors]
-      options.splice(position - 1, 0, request.brandName)
-      
-      options.slice(0, 5).forEach((option, index) => {
-        text += `${index + 1}. ${option} - Great option for businesses\n`
-      })
-    } else {
-      text += `1. Alternative Tool - Popular choice\n2. Another Platform - Good features\n3. Different Service - Solid option\n`
-    }
-    
-    return {
-      text,
-      sources: [
-        {
-          url: 'https://techcrunch.com/tools-review',
-          domain: 'techcrunch.com',
-          title: 'Best Tools Review 2025',
-          date: new Date().toISOString()
-        },
-        {
-          url: 'https://forbes.com/business-software',
-          domain: 'forbes.com', 
-          title: 'Top Business Software',
-          date: new Date().toISOString()
-        }
-      ]
-    }
-  }
-
-  /**
-   * Mock Gemini response for development
-   */
-  private async getMockGeminiResponse(request: ScanRequest): Promise<{
-    text: string
-    sources: Array<{ url: string; domain: string; title: string; date?: string }>
-  }> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const shouldMention = Math.random() > 0.4
-    const position = shouldMention ? Math.floor(Math.random() * 3) + 1 : null
-    
-    let text = `Based on current market analysis, here are leading ${request.topic}:\n\n`
-    
-    if (shouldMention && position) {
-      const competitors = ['Leading Tool', 'Market Leader', 'Top Platform']
-      const options = [...competitors]
-      options.splice(position - 1, 0, request.brandName)
-      
-      options.slice(0, 3).forEach((option, index) => {
-        text += `• ${option}: Excellent choice with strong market presence\n`
-      })
-    } else {
-      text += `• Industry Standard: Widely used solution\n• Popular Choice: Great user feedback\n• Emerging Leader: Growing market share\n`
-    }
-    
-    return {
-      text,
-      sources: [
-        {
-          url: 'https://gartner.com/research/tools',
-          domain: 'gartner.com',
-          title: 'Market Research Report',
-          date: new Date().toISOString()
-        },
-        {
-          url: 'https://capterra.com/software-reviews',
-          domain: 'capterra.com',
-          title: 'Software Reviews & Ratings',
-          date: new Date().toISOString()
-        }
-      ]
+      // Don't throw error to avoid breaking the scan process
     }
   }
 }
 
-// Export singleton instance
 export const aiScanningService = new AIScanningService()

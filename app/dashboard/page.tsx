@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -101,6 +102,7 @@ type SidebarItem = 'overview' | 'projects' | 'keyword-research' | 'mention-track
 
 export default function Dashboard() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [projects, setProjects] = useState<Project[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [isClient, setIsClient] = useState(false)
