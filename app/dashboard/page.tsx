@@ -447,8 +447,8 @@ export default function Dashboard() {
         console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
         
         try {
-          // Call the debug route first to see what's failing
-          const scanResponse = await fetch('/api/debug-scan', {
+          // Call the real AI scanning API
+          const scanResponse = await fetch('/api/mentions/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -463,53 +463,63 @@ export default function Dashboard() {
             
             // Process real scan results
             if (scanData.results && Array.isArray(scanData.results)) {
+              console.log(`📊 Processing ${scanData.results.length} scan results`)
+              
               for (const result of scanData.results) {
+                console.log(`🔍 Processing result for keyword: ${result.keyword}`)
+                
                 if (result.results && Array.isArray(result.results)) {
                   for (const platformResult of result.results) {
+                    console.log(`📱 Platform ${platformResult.platform}: brandMentioned=${platformResult.brandMentioned}`)
+                    
+                    // Always create a result entry (found or not found)
+                    const mentionResult = {
+                      id: Date.now().toString() + Math.random(),
+                      projectId,
+                      projectName: project.name,
+                      brandName: project.brandName,
+                      keyword: trackingItem.keyword,
+                      topic: trackingItem.topic,
+                      aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
+                      hasMention: platformResult.brandMentioned,
+                      mentionType: platformResult.brandMentioned ? 'positive' : 'neutral',
+                      detectedAt: new Date().toISOString(),
+                      source: platformResult.platform,
+                      content: platformResult.brandMentioned 
+                        ? `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`
+                        : `No mention of ${project.brandName} found in ${platformResult.platform} response about "${trackingItem.topic}"`,
+                      position: platformResult.position,
+                      platform: platformResult.platform
+                    }
+                    
+                    // Add to mention results
+                    setMentionResults(prev => [mentionResult, ...prev])
+                    
+                    // Update localStorage
+                    const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                    const updatedResults = [mentionResult, ...existingResults]
+                    localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+                    
+                    // Always process source URLs (even if no mention found)
+                    if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                      const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
+                        id: `source-${Date.now()}-${Math.random()}`,
+                        url: urlData.url,
+                        domain: urlData.domain,
+                        title: urlData.title,
+                        date: urlData.date || new Date().toISOString(),
+                        keyword: trackingItem.keyword,
+                        platform: platformResult.platform,
+                        brandMentioned: platformResult.brandMentioned
+                      }))
+                      
+                      // Add to data sources
+                      setDataSources(prev => [...sourceUrls, ...prev])
+                    }
+                    
+                    // Count mentions for success message
                     if (platformResult.brandMentioned) {
                       totalMentions++
-                      
-                      // Create real mention result from AI scanning
-                      const mentionResult = {
-                        id: Date.now().toString() + Math.random(),
-                        projectId,
-                        projectName: project.name,
-                        brandName: project.brandName,
-                        keyword: trackingItem.keyword,
-                        topic: trackingItem.topic,
-                        aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
-                        hasMention: true,
-                        mentionType: 'positive', // AI found the mention
-                        detectedAt: new Date().toISOString(),
-                        source: platformResult.platform,
-                        content: `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`,
-                        position: platformResult.position,
-                        platform: platformResult.platform
-                      }
-                      
-                      // Add to mention results
-                      setMentionResults(prev => [mentionResult, ...prev])
-                      
-                      // Update localStorage
-                      const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-                      const updatedResults = [mentionResult, ...existingResults]
-                      localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
-                      
-                      // Process real source URLs from AI scanning
-                      if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
-                        const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
-                          id: `source-${Date.now()}-${Math.random()}`,
-                          url: urlData.url,
-                          domain: urlData.domain,
-                          title: urlData.title,
-                          date: urlData.date || new Date().toISOString(),
-                          keyword: trackingItem.keyword,
-                          platform: platformResult.platform
-                        }))
-                        
-                        // Add to data sources
-                        setDataSources(prev => [...sourceUrls, ...prev])
-                      }
                     }
                   }
                 }
@@ -587,8 +597,8 @@ export default function Dashboard() {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
           try {
-                                             // Call the debug route first to see what's failing
-           const scanResponse = await fetch('/api/debug-scan', {
+                                             // Call the real AI scanning API
+           const scanResponse = await fetch('/api/mentions/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -603,53 +613,63 @@ export default function Dashboard() {
               
               // Process real scan results
               if (scanData.results && Array.isArray(scanData.results)) {
+                console.log(`📊 Processing ${scanData.results.length} scan results`)
+                
                 for (const result of scanData.results) {
+                  console.log(`🔍 Processing result for keyword: ${result.keyword}`)
+                  
                   if (result.results && Array.isArray(result.results)) {
                     for (const platformResult of result.results) {
+                      console.log(`📱 Platform ${platformResult.platform}: brandMentioned=${platformResult.brandMentioned}`)
+                      
+                      // Always create a result entry (found or not found)
+                      const mentionResult = {
+                        id: Date.now().toString() + Math.random(),
+                        projectId,
+                        projectName: project.name,
+                        brandName: project.brandName,
+                        keyword: trackingItem.keyword,
+                        topic: trackingItem.topic,
+                        aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
+                        hasMention: platformResult.brandMentioned,
+                        mentionType: platformResult.brandMentioned ? 'positive' : 'neutral',
+                        detectedAt: new Date().toISOString(),
+                        source: platformResult.platform,
+                        content: platformResult.brandMentioned 
+                          ? `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`
+                          : `No mention of ${project.brandName} found in ${platformResult.platform} response about "${trackingItem.topic}"`,
+                        position: platformResult.position,
+                        platform: platformResult.platform
+                      }
+                      
+                      // Add to mention results
+                      setMentionResults(prev => [mentionResult, ...prev])
+                      
+                      // Update localStorage
+                      const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                      const updatedResults = [mentionResult, ...existingResults]
+                      localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
+                      
+                      // Always process source URLs (even if no mention found)
+                      if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                        const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
+                          id: `source-${Date.now()}-${Math.random()}`,
+                          url: urlData.url,
+                          domain: urlData.domain,
+                          title: urlData.title,
+                          date: urlData.date || new Date().toISOString(),
+                          keyword: trackingItem.keyword,
+                          platform: platformResult.platform,
+                          brandMentioned: platformResult.brandMentioned
+                        }))
+                        
+                        // Add to data sources
+                        setDataSources(prev => [...sourceUrls, ...prev])
+                      }
+                      
+                      // Count mentions for success message
                       if (platformResult.brandMentioned) {
                         totalMentions++
-                        
-                        // Create real mention result from AI scanning
-                        const mentionResult = {
-                          id: Date.now().toString() + Math.random(),
-                          projectId,
-                          projectName: project.name,
-                          brandName: project.brandName,
-                          keyword: trackingItem.keyword,
-                          topic: trackingItem.topic,
-                          aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${trackingItem.topic}`,
-                          hasMention: true,
-                          mentionType: 'positive', // AI found the mention
-                          detectedAt: new Date().toISOString(),
-                          source: platformResult.platform,
-                          content: `Found mention of ${project.brandName} in ${platformResult.platform} response about "${trackingItem.topic}" at position ${platformResult.position}`,
-                          position: platformResult.position,
-                          platform: platformResult.platform
-                        }
-                        
-                        // Add to mention results
-                        setMentionResults(prev => [mentionResult, ...prev])
-                        
-                        // Update localStorage
-                        const existingResults = JSON.parse(localStorage.getItem('mentionResults') || '[]')
-                        const updatedResults = [mentionResult, ...existingResults]
-                        localStorage.setItem('mentionResults', JSON.stringify(updatedResults))
-                        
-                        // Process real source URLs from AI scanning
-                        if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
-                          const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
-                            id: `source-${Date.now()}-${Math.random()}`,
-                            url: urlData.url,
-                            domain: urlData.domain,
-                            title: urlData.title,
-                            date: urlData.date || new Date().toISOString(),
-                            keyword: trackingItem.keyword,
-                            platform: platformResult.platform
-                          }))
-                          
-                          // Add to data sources
-                          setDataSources(prev => [...sourceUrls, ...prev])
-                        }
                       }
                     }
                   }
@@ -2027,6 +2047,30 @@ export default function Dashboard() {
                                                 <div className="flex items-center gap-1">
                                                   {/* Position metrics display */}
                                                   <div className="flex items-center gap-4 text-xs">
+                                                    {/* Status indicator - Found/Not Found */}
+                                                    <div className="flex items-center gap-1">
+                                                      <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                                        (() => {
+                                                          const projectMentions = mentionResults.filter(m => 
+                                                            m.projectId === projectId && 
+                                                            m.topic === topic.topic
+                                                          )
+                                                          const hasAnyMentions = projectMentions.some(m => m.hasMention)
+                                                          return hasAnyMentions 
+                                                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                                                            : 'bg-red-100 text-red-800 border border-red-200'
+                                                        })()
+                                                      }`}>
+                                                        {(() => {
+                                                          const projectMentions = mentionResults.filter(m => 
+                                                            m.projectId === projectId && 
+                                                            m.topic === topic.topic
+                                                          )
+                                                          const hasAnyMentions = projectMentions.some(m => m.hasMention)
+                                                          return hasAnyMentions ? 'Found' : 'Not Found'
+                                                        })()}
+                                                      </span>
+                                                    </div>
                                                     <div className="flex items-center gap-1">
                                                       <span className="text-muted-foreground">Avg:</span>
                                                       <span className="font-medium">
