@@ -720,16 +720,25 @@ export default function Dashboard() {
     }
   }
 
-  const loadProjectsFromDatabase = async () => {
+  const loadProjectsFromDatabase = async (retryCount = 0) => {
     try {
-      console.log('🔄 Loading projects from database...')
+      console.log(`🔄 Loading projects from database... (attempt ${retryCount + 1})`)
       
-      // Load existing projects from the database
-      const response = await fetch('/api/mentions/status')
-      if (response.ok) {
-        const data = await response.json()
+      // Add longer timeout for cold starts
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      try {
+        // Load existing projects from the database
+        const response = await fetch('/api/mentions/status', {
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
         
-        if (data.brandTracking && Array.isArray(data.brandTracking)) {
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (data.brandTracking && Array.isArray(data.brandTracking)) {
           // Convert database projects to Project format
           const dbProjects: Project[] = data.brandTracking.map((tracking: any) => ({
             id: tracking.id,
@@ -773,20 +782,27 @@ export default function Dashboard() {
             growthRate: 0
           })
         }
-      } else {
-        console.error('❌ Failed to load projects from database')
-        // Fallback to empty projects
-        setProjects([])
-        setStats({
-          totalProjects: 0,
-          activeKeywords: 0,
-          totalMentions: 0,
-          thisMonthMentions: 0,
-          growthRate: 0
-        })
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        throw fetchError
       }
     } catch (error) {
-      console.error('❌ Error loading projects:', error)
+      console.error(`❌ Error loading projects from database (attempt ${retryCount + 1}):`, error)
+      
+      // Retry logic for cold starts
+      if (retryCount < 2 && (error.name === 'AbortError' || error.message.includes('fetch') || error.message.includes('HTTP'))) {
+        console.log(`🔄 Retrying in 3 seconds... (attempt ${retryCount + 2}/3)`)
+        setTimeout(() => {
+          loadProjectsFromDatabase(retryCount + 1)
+        }, 3000)
+        return
+      }
+      
+      // Final fallback
+      console.error('❌ All retry attempts failed, using empty project list')
       // Fallback to empty projects
       setProjects([])
       setStats({
