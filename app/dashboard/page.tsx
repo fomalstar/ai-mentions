@@ -815,14 +815,56 @@ export default function Dashboard() {
     setStats(demoStats)
   }
 
-  const handleProjectCreated = (newProject: Project) => {
-    setProjects(prev => [...prev, newProject])
-    // Update stats
-    if (stats) {
-      setStats({
-        ...stats,
-        totalProjects: stats.totalProjects + 1
+  const handleProjectCreated = async (newProject: Project) => {
+    try {
+      console.log('🔄 Saving new project to database:', newProject)
+      
+      // Save project to database via API
+      const response = await fetch('/api/mentions/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: newProject.brandName,
+          description: newProject.description,
+          website: newProject.website,
+          keywords: [newProject.name], // Use project name as initial keyword
+          topics: [newProject.description] // Use description as initial topic
+        })
       })
+      
+      if (response.ok) {
+        const savedProject = await response.json()
+        console.log('✅ Project saved to database:', savedProject)
+        
+        // Update local state with the saved project (including real ID from database)
+        setProjects(prev => [...prev, {
+          ...newProject,
+          id: savedProject.id || newProject.id
+        }])
+        
+        // Update stats
+        if (stats) {
+          setStats({
+            ...stats,
+            totalProjects: stats.totalProjects + 1
+          })
+        }
+        
+        toast.success('Project created and saved to database!')
+      } else {
+        const errorData = await response.json()
+        console.error('❌ Failed to save project to database:', errorData)
+        toast.error('Failed to save project to database')
+        
+        // Still add to local state as fallback
+        setProjects(prev => [...prev, newProject])
+      }
+    } catch (error) {
+      console.error('❌ Error saving project:', error)
+      toast.error('Error saving project to database')
+      
+      // Fallback to local state
+      setProjects(prev => [...prev, newProject])
     }
   }
 
@@ -914,7 +956,31 @@ export default function Dashboard() {
       lastChecked: null // Track when it was last checked
     }
     
-    // Save to localStorage
+    try {
+      // Save topic to database
+      const response = await fetch('/api/mentions/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: project.brandName,
+          keywords: [keywordResults.keyword],
+          topics: [topic.question]
+        })
+      })
+      
+      if (response.ok) {
+        console.log('✅ Topic saved to database')
+        toast.success(`"${topic.question}" added to "${project.name}" for tracking`)
+      } else {
+        console.error('❌ Failed to save topic to database')
+        toast.error('Failed to save topic to database')
+      }
+    } catch (error) {
+      console.error('❌ Error saving topic:', error)
+      toast.error('Error saving topic to database')
+    }
+    
+    // Save to localStorage as backup
     const updatedTracking = [...existingTracking, trackingItem]
     localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
     
@@ -932,8 +998,6 @@ export default function Dashboard() {
         activeKeywords: stats.activeKeywords + 1
       })
     }
-    
-    toast.success(`Added "${topic.question}" to "${project.name}" project for keyword "${keywordResults.keyword}"`)
     
     console.log('Added to project tracking:', trackingItem)
   }
