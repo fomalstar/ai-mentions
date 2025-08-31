@@ -104,7 +104,24 @@ export async function POST(request: NextRequest) {
       
       for (const keyword of brandTracking.keywordTracking) {
         try {
-          console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${keyword.topic}`)
+          // Validate and clean the topic
+          let scanTopic = keyword.topic
+          
+          // Check if topic is valid (not corrupted or too short)
+          if (!scanTopic || scanTopic.trim().length < 3 || scanTopic.includes('erg') || scanTopic.length < 5) {
+            console.warn(`⚠️ Invalid/corrupted topic detected: "${scanTopic}" for keyword: "${keyword.keyword}"`)
+            
+            // Try to construct a meaningful topic from the keyword
+            if (keyword.keyword && keyword.keyword.trim().length > 2) {
+              scanTopic = `What are the best ${keyword.keyword} tools and services?`
+              console.log(`🔧 Constructed fallback topic: "${scanTopic}"`)
+            } else {
+              console.error(`❌ Cannot scan: both topic and keyword are invalid`)
+              continue // Skip this keyword
+            }
+          }
+          
+          console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${scanTopic}`)
           
           // Check if required environment variables are set
           if (!process.env.PERPLEXITY_API_KEY || !process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY) {
@@ -117,7 +134,7 @@ export async function POST(request: NextRequest) {
             keywordTrackingId: keyword.id,
             brandName: brandTracking.displayName,
             keyword: keyword.keyword,
-            topic: keyword.topic || keyword.keyword // Fallback if topic is missing
+            topic: scanTopic // Use the validated/cleaned topic
           })
           
           console.log(`✅ AI scan completed for keyword: ${keyword.keyword}`)

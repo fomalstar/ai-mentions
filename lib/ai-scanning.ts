@@ -35,7 +35,7 @@ export class AIScanningService {
    * Scan a single keyword/topic across all AI platforms
    */
   async scanKeyword(request: ScanRequest): Promise<ScanResult[]> {
-    const results: ScanResult[] = []
+    let results: ScanResult[] = []
     
     // Scan each platform
     const platforms = [
