@@ -38,20 +38,20 @@ export async function GET(request: NextRequest) {
     console.log('📋 Brand tracking found:', brandTracking.length, 'records')
     console.log('📋 Brand tracking data:', JSON.stringify(brandTracking, null, 2))
 
-    // Test what the status endpoint would return
-    const statusResponse = await fetch(new URL('/api/mentions/status', request.url).toString(), {
-      headers: {
-        'Cookie': request.headers.get('cookie') || ''
-      }
-    })
-    
-    let statusData = null
-    if (statusResponse.ok) {
-      statusData = await statusResponse.json()
-      console.log('📊 Status endpoint response:', JSON.stringify(statusData, null, 2))
-    } else {
-      console.error('❌ Status endpoint failed:', statusResponse.status, statusResponse.statusText)
-    }
+    // Check what data would be in the response format
+    const formattedData = brandTracking.map(brand => ({
+      id: brand.id,
+      displayName: brand.displayName,
+      brandName: brand.brandName,
+      website: brand.website,
+      description: brand.description,
+      isActive: brand.isActive,
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+      keywordTracking: brand.keywordTracking
+    }))
+
+    console.log('📊 Formatted brand tracking data:', JSON.stringify(formattedData, null, 2))
 
     return NextResponse.json({
       success: true,
@@ -60,8 +60,9 @@ export async function GET(request: NextRequest) {
         databaseUserId: dbUser.id,
         brandTrackingCount: brandTracking.length,
         brandTrackingData: brandTracking,
-        statusEndpointWorking: statusResponse.ok,
-        statusData: statusData
+        formattedData: formattedData,
+        userEmail: session.user.email,
+        timestamp: new Date().toISOString()
       }
     })
 
