@@ -28,9 +28,9 @@ export class AITrackingService {
   private geminiApiKey: string
 
   constructor() {
-    this.perplexityApiKey = process.env.PERPLEXITY_API_KEY || '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'
-    this.openaiApiKey = process.env.OPENAI_API_KEY || 'sk-proj-...' // You have this
-    this.geminiApiKey = process.env.GEMINI_API_KEY || 'AIzaSyAZw58C8pkin4iVTPg3usRQGHIkB6FyCtw'
+    this.perplexityApiKey = process.env.PERPLEXITY_API_KEY || ''
+    this.openaiApiKey = process.env.OPENAI_API_KEY || ''
+    this.geminiApiKey = process.env.GEMINI_API_KEY || ''
   }
 
   async checkForBrandMentions(trackingItem: TrackingItem): Promise<MentionResult[]> {
@@ -39,7 +39,7 @@ export class AITrackingService {
     console.log(`Checking brand mentions for: ${trackingItem.brandName} - Topic: ${trackingItem.topic}`)
     
     // Check with Perplexity
-    if (this.perplexityApiKey) {
+    if (this.perplexityApiKey && this.perplexityApiKey.trim() !== '') {
       try {
         console.log('Checking with Perplexity...')
         const perplexityResult = await this.checkWithPerplexity(trackingItem)
@@ -47,11 +47,14 @@ export class AITrackingService {
         console.log('Perplexity result:', perplexityResult.hasMention ? 'MENTION FOUND' : 'No mention')
       } catch (error) {
         console.error('Perplexity tracking error:', error)
+        throw error
       }
+    } else {
+      throw new Error('PERPLEXITY_API_KEY environment variable is not set')
     }
 
     // Check with OpenAI/ChatGPT
-    if (this.openaiApiKey) {
+    if (this.openaiApiKey && this.openaiApiKey.trim() !== '') {
       try {
         console.log('Checking with OpenAI...')
         const openaiResult = await this.checkWithOpenAI(trackingItem)
@@ -59,11 +62,14 @@ export class AITrackingService {
         console.log('OpenAI result:', openaiResult.hasMention ? 'MENTION FOUND' : 'No mention')
       } catch (error) {
         console.error('OpenAI tracking error:', error)
+        throw error
       }
+    } else {
+      throw new Error('OPENAI_API_KEY environment variable is not set')
     }
 
     // Check with Gemini
-    if (this.geminiApiKey) {
+    if (this.geminiApiKey && this.geminiApiKey.trim() !== '') {
       try {
         console.log('Checking with Gemini...')
         const geminiResult = await this.checkWithGemini(trackingItem)
@@ -71,7 +77,10 @@ export class AITrackingService {
         console.log('Gemini result:', geminiResult.hasMention ? 'MENTION FOUND' : 'No mention')
       } catch (error) {
         console.error('Gemini tracking error:', error)
+        throw error
       }
+    } else {
+      throw new Error('GEMINI_API_KEY environment variable is not set')
     }
 
     console.log(`Completed checking. Found ${results.filter(r => r.hasMention).length} mentions out of ${results.length} total checks`)
@@ -241,6 +250,8 @@ Focus on practical insights and real-world applications. Be helpful and informat
     
     return allResults
   }
+
+
 }
 
 export const aiTrackingService = new AITrackingService()

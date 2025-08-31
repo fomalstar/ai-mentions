@@ -10,10 +10,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { brandName, keywords, competitors } = await request.json()
+    const { brandName, keywords, topics, competitors } = await request.json()
     
     if (!brandName || !keywords || !Array.isArray(keywords)) {
       return NextResponse.json({ error: 'Brand name and keywords are required' }, { status: 400 })
+    }
+
+    if (!topics || !Array.isArray(topics) || topics.length !== keywords.length) {
+      return NextResponse.json({ error: 'Topics array must match keywords array' }, { status: 400 })
     }
 
     // Check if database is available
@@ -69,19 +73,28 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Create tracking keywords
-    for (const keyword of keywords) {
-      await prisma.trackingKeyword.upsert({
+    // Create tracking keywords with topics
+    for (let i = 0; i < keywords.length; i++) {
+      const keyword = keywords[i]
+      const topic = topics[i]
+      
+      await prisma.keywordTracking.upsert({
         where: {
-          trackingId_keyword: {
-            trackingId: tracking.id,
+          brandTrackingId_keyword: {
+            brandTrackingId: tracking.id,
             keyword: keyword.toLowerCase()
           }
         },
-        update: {},
+        update: {
+          topic: topic,
+          isActive: true,
+          updatedAt: new Date()
+        },
         create: {
-          trackingId: tracking.id,
+          userId: session.user.id,
+          brandTrackingId: tracking.id,
           keyword: keyword.toLowerCase(),
+          topic: topic,
           isActive: true
         }
       })

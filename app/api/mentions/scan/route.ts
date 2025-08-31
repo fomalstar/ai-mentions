@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
             keywordTrackingId: keyword.id,
             brandName: brandTracking.displayName,
             keyword: keyword.keyword,
-            topic: keyword.topic
+            topic: keyword.topic || keyword.keyword // Fallback if topic is missing
           })
           
           results.push({

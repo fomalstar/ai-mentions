@@ -46,36 +46,49 @@ export class AIScanningService {
   async scanKeyword(request: ScanRequest): Promise<ScanResult[]> {
     const results: ScanResult[] = []
     
+    console.log(`🔍 Starting AI scan for: ${request.brandName} - ${request.keyword} - ${request.topic}`)
+    
     try {
       // Scan Perplexity (we have the API ready)
+      console.log('📡 Scanning Perplexity...')
       const perplexityResult = await this.scanPerplexity(request)
       results.push(perplexityResult)
+      console.log(`✅ Perplexity scan complete: ${perplexityResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${perplexityResult.position}`)
       
       // Scan ChatGPT (mock for now, will implement with real API)
+      console.log('📡 Scanning ChatGPT...')
       const chatgptResult = await this.scanChatGPT(request)
       results.push(chatgptResult)
+      console.log(`✅ ChatGPT scan complete: ${chatgptResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${chatgptResult.position}`)
       
       // Scan Gemini (mock for now, will implement with real API)
+      console.log('📡 Scanning Gemini...')
       const geminiResult = await this.scanGemini(request)
       results.push(geminiResult)
+      console.log(`✅ Gemini scan complete: ${geminiResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${geminiResult.position}`)
       
-      // Store results in database (if available)
+      // Store results in database
+      console.log('💾 Storing results in database...')
       try {
         await this.storeResults(request, results)
+        console.log('✅ Results stored successfully')
       } catch (error) {
-        console.warn('Could not store scan results:', error.message)
+        console.warn('⚠️ Could not store scan results:', error.message)
       }
       
-      // Update keyword tracking metrics (if available)
+      // Update keyword tracking metrics
+      console.log('📊 Updating keyword metrics...')
       try {
         await this.updateKeywordMetrics(request.keywordTrackingId, results)
+        console.log('✅ Metrics updated successfully')
       } catch (error) {
-        console.warn('Could not update keyword metrics:', error.message)
+        console.warn('⚠️ Could not update keyword metrics:', error.message)
       }
       
+      console.log(`🎯 Scan complete! Found mentions in ${results.filter(r => r.brandMentioned).length} out of ${results.length} platforms`)
       return results
     } catch (error) {
-      console.error('AI scanning error:', error)
+      console.error('❌ AI scanning error:', error)
       throw error
     }
   }
@@ -121,7 +134,7 @@ export class AIScanningService {
       }
     } catch (error) {
       console.error('Perplexity scanning error:', error)
-      return this.createErrorResult('perplexity', query, Date.now() - startTime)
+      throw error
     }
   }
 
@@ -166,7 +179,7 @@ export class AIScanningService {
       }
     } catch (error) {
       console.error('ChatGPT scanning error:', error)
-      return this.createErrorResult('chatgpt', query, Date.now() - startTime)
+      throw error
     }
   }
 
@@ -211,7 +224,7 @@ export class AIScanningService {
       }
     } catch (error) {
       console.error('Gemini scanning error:', error)
-      return this.createErrorResult('gemini', query, Date.now() - startTime)
+      throw error
     }
   }
 
@@ -451,14 +464,8 @@ export class AIScanningService {
    */
   private async storeResults(request: ScanRequest, results: ScanResult[]): Promise<void> {
     try {
-      // Check if the new models exist in the database
-      if (!(prisma as any).scanResult) {
-        console.warn('ScanResult model not available - database schema needs to be updated')
-        return
-      }
-
       for (const result of results) {
-        await (prisma as any).scanResult.create({
+        await prisma.scanResult.create({
           data: {
             userId: request.userId,
             brandTrackingId: request.brandTrackingId,
@@ -486,12 +493,6 @@ export class AIScanningService {
    */
   private async updateKeywordMetrics(keywordTrackingId: string, results: ScanResult[]): Promise<void> {
     try {
-      // Check if the new models exist in the database
-      if (!(prisma as any).keywordTracking) {
-        console.warn('KeywordTracking model not available - database schema needs to be updated')
-        return
-      }
-
       // Calculate average position across platforms
       const positions = results
         .filter(r => r.position !== null)
@@ -502,7 +503,7 @@ export class AIScanningService {
         : null
 
       // Get current metrics for comparison
-      const currentKeyword = await (prisma as any).keywordTracking.findUnique({
+      const currentKeyword = await prisma.keywordTracking.findUnique({
         where: { id: keywordTrackingId }
       })
 
@@ -512,7 +513,7 @@ export class AIScanningService {
         : null
 
       // Update keyword tracking
-      await (prisma as any).keywordTracking.update({
+      await prisma.keywordTracking.update({
         where: { id: keywordTrackingId },
         data: {
           avgPosition,
@@ -546,6 +547,8 @@ export class AIScanningService {
       scanDuration: duration
     }
   }
+
+
 
   /**
    * Mock ChatGPT response for development

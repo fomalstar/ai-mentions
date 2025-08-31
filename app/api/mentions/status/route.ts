@@ -123,11 +123,9 @@ export async function GET(request: NextRequest) {
         keyword: kw.keyword,
         topic: kw.topic,
         avgPosition: kw.avgPosition,
-        platforms: {
-          chatgpt: kw.chatgptPosition,
-          perplexity: kw.perplexityPosition,
-          gemini: kw.geminiPosition
-        },
+        chatgptPosition: kw.chatgptPosition,
+        perplexityPosition: kw.perplexityPosition,
+        geminiPosition: kw.geminiPosition,
         positionChange: kw.positionChange,
         lastScanAt: kw.lastScanAt,
         scanCount: kw.scanCount

@@ -32,7 +32,7 @@ export class PerplexityClient {
   private baseUrl: string
 
   constructor() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY || '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'
+    this.apiKey = process.env.PERPLEXITY_API_KEY || ''
     this.baseUrl = 'https://api.perplexity.ai/chat/completions'
   }
 
@@ -41,6 +41,9 @@ export class PerplexityClient {
     strategicRecommendation: string
     marketInsights: string
   }> {
+    if (!this.apiKey || this.apiKey.trim() === '') {
+      throw new Error('PERPLEXITY_API_KEY environment variable is not set')
+    }
     const prompt = `You are an expert AI marketing analyst specializing in AI query analysis and content strategy. 
 
 Analyze the keyword "${keyword}" and provide:
@@ -221,6 +224,10 @@ Return ONLY a JSON array of keywords, no explanations:
   }
 
   async getRealTimeInsights(keyword: string): Promise<string> {
+    if (!this.apiKey || this.apiKey.trim() === '') {
+      throw new Error('PERPLEXITY_API_KEY environment variable is not set')
+    }
+
     const prompt = `Provide real-time insights about the keyword "${keyword}" including:
     - Current market trends
     - Recent developments
@@ -260,6 +267,8 @@ Return ONLY a JSON array of keywords, no explanations:
       return 'Unable to fetch real-time insights at this time.'
     }
   }
+
+
 }
 
 export const perplexityClient = new PerplexityClient()

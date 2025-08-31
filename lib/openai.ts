@@ -1,5 +1,5 @@
-// Simplified OpenAI client for development
-// TODO: Install openai package when npm issues are resolved
+// OpenAI client using environment variables
+import OpenAI from 'openai'
 
 export interface AIQuery {
   question: string
@@ -26,27 +26,94 @@ export interface KeywordAnalysis {
 }
 
 export class OpenAIClient {
+  private static openai: OpenAI | null = null
+
+  private static getClient(): OpenAI {
+    if (!this.openai) {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        throw new Error('OPENAI_API_KEY environment variable is not set')
+      }
+      this.openai = new OpenAI({ apiKey })
+    }
+    return this.openai
+  }
+
   /**
    * Generate AI queries and questions around a keyword
    */
   static async generateAIQueries(keyword: string): Promise<AIQuery[]> {
-    // For now, return mock data since we can't install the OpenAI package
-    // TODO: Replace with actual OpenAI API calls
-    return this.generateMockAIQueries(keyword)
+    try {
+      const client = this.getClient()
+      const response = await client.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert AI marketing analyst specializing in AI query analysis and content strategy.'
+          },
+          {
+            role: 'user',
+            content: `Generate 5 specific AI queries that people ask about "${keyword}". Each query should have a query volume (High/Medium/Low), mention opportunity score (1-10), and reasoning. Return as JSON.`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000
+      })
+
+      const content = response.choices[0]?.message?.content
+      if (content) {
+        try {
+          const jsonMatch = content.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const result = JSON.parse(jsonMatch[0])
+            return result.queries || this.generateMockAIQueries(keyword)
+          }
+        } catch (parseError) {
+          console.error('Failed to parse OpenAI response:', parseError)
+        }
+      }
+      
+      return this.generateMockAIQueries(keyword)
+    } catch (error) {
+      console.error('OpenAI API error:', error)
+      return this.generateMockAIQueries(keyword)
+    }
   }
 
   /**
    * Generate strategic recommendation based on AI queries
    */
   static async generateStrategicRecommendation(keyword: string, aiQueries: AIQuery[]): Promise<string> {
-    // TODO: Replace with actual OpenAI API calls
-    const highOpportunityQueries = aiQueries.filter(q => q.mentionOpportunityScore >= 7)
-    
-    if (highOpportunityQueries.length > 0) {
-      return `Focus on questions with high mention opportunity scores (7-10) like "${highOpportunityQueries[0].question}" for maximum brand visibility impact. These questions provide the best opportunities to insert product recommendations and brand mentions.`
+    try {
+      const client = this.getClient()
+      const response = await client.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert marketing strategist.'
+          },
+          {
+            role: 'user',
+            content: `Based on these AI queries about "${keyword}", provide a strategic recommendation: ${JSON.stringify(aiQueries)}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+
+      return response.choices[0]?.message?.content || 'Focus on questions with high mention opportunity scores (7-10) for maximum brand visibility impact.'
+    } catch (error) {
+      console.error('OpenAI API error:', error)
+      const highOpportunityQueries = aiQueries.filter(q => q.mentionOpportunityScore >= 7)
+      
+      if (highOpportunityQueries.length > 0) {
+        return `Focus on questions with high mention opportunity scores (7-10) like "${highOpportunityQueries[0].question}" for maximum brand visibility impact. These questions provide the best opportunities to insert product recommendations and brand mentions.`
+      }
+      
+      return 'Focus on questions with high mention opportunity scores (7-10) for maximum brand visibility impact.'
     }
-    
-    return 'Focus on questions with high mention opportunity scores (7-10) for maximum brand visibility impact.'
   }
 
   /**

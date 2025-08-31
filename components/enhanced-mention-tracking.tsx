@@ -139,6 +139,59 @@ export function EnhancedMentionTracking() {
     }
   }
 
+  const startScanAll = async () => {
+    setIsScanning(true)
+    setScanProgress(0)
+    
+    try {
+      const totalBrands = brands.length
+      let completedBrands = 0
+      
+      for (const brand of brands) {
+        try {
+          const response = await fetch('/api/mentions/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              brandTrackingId: brand.id, 
+              immediate: true 
+            })
+          })
+
+          if (response.ok) {
+            completedBrands++
+            const progress = Math.round((completedBrands / totalBrands) * 100)
+            setScanProgress(progress)
+          } else {
+            console.error(`Failed to scan brand ${brand.displayName}`)
+          }
+        } catch (error) {
+          console.error(`Error scanning brand ${brand.displayName}:`, error)
+        }
+        
+        // Add delay between scans to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+      
+      toast.success(`Scan completed for ${completedBrands} out of ${totalBrands} brands!`)
+      
+      // Refresh data after completion
+      setTimeout(() => {
+        loadData()
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Scan all error:', error)
+      toast.error('Failed to complete all scans')
+    } finally {
+      setTimeout(() => {
+        setIsScanning(false)
+        setScanProgress(0)
+        setSelectedBrand(null)
+      }, 1000)
+    }
+  }
+
   const stopScanning = async (brandId: string) => {
     try {
       const response = await fetch('/api/mentions/stop', {
@@ -168,12 +221,16 @@ export function EnhancedMentionTracking() {
 
     try {
       const keywords = newBrand.keywords.split(',').map(k => k.trim()).filter(k => k)
+      // Create topics from keywords (you can modify this logic)
+      const topics = keywords.map(keyword => `What are the best ${keyword} tools and platforms?`)
+      
       const response = await fetch('/api/mentions/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandName: newBrand.name,
           keywords,
+          topics,
           website: newBrand.website
         })
       })
@@ -221,13 +278,34 @@ export function EnhancedMentionTracking() {
           <h1 className="text-3xl font-bold">Enhanced Mention Tracking</h1>
           <p className="text-muted-foreground">Track your brand mentions across AI platforms with position rankings</p>
         </div>
-        <Dialog open={showAddBrand} onOpenChange={setShowAddBrand}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Brand
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (brands.length > 0) {
+                setSelectedBrand('all')
+                startScanAll()
+              } else {
+                toast.error('No brands configured to scan')
+              }
+            }}
+            disabled={isScanning || brands.length === 0}
+            className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+          >
+            {isScanning && selectedBrand === 'all' ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Scan All Projects
+          </Button>
+          <Dialog open={showAddBrand} onOpenChange={setShowAddBrand}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Add Brand
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Brand</DialogTitle>
@@ -321,7 +399,10 @@ export function EnhancedMentionTracking() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => startScan(brand.id, true)}
+                      onClick={() => {
+                        setSelectedBrand(brand.id)
+                        startScan(brand.id, true)
+                      }}
                       disabled={isScanning}
                       className="bg-red-500 hover:bg-red-600 text-white border-red-500"
                     >

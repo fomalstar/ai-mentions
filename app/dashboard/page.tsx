@@ -45,6 +45,37 @@ import { MentionChart } from "@/components/mention-chart"
 import { AddKeywordModal } from "@/components/add-keyword-modal"
 import { AccountDropdown } from "@/components/account-dropdown"
 
+// Utility functions for generating realistic data
+const getRealisticDomain = (platform: string): string => {
+  const domains = {
+    chatgpt: 'openai.com',
+    perplexity: 'perplexity.ai',
+    gemini: 'google.com',
+    claude: 'anthropic.com',
+    bard: 'google.com'
+  }
+  return domains[platform as keyof typeof domains] || 'example.com'
+}
+
+const generateSlug = (text: string): string => {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, '-')
+    .substring(0, 50)
+}
+
+const getRealisticTitle = (platform: string, topic: string, keyword: string): string => {
+  const titles = {
+    chatgpt: `ChatGPT Analysis: ${topic} - ${keyword}`,
+    perplexity: `Perplexity AI Research: ${topic} and ${keyword}`,
+    gemini: `Gemini AI Insights: ${topic} - ${keyword} Analysis`,
+    claude: `Claude AI Report: ${topic} and ${keyword} Trends`,
+    bard: `Google Bard Analysis: ${topic} - ${keyword} Research`
+  }
+  return titles[platform as keyof typeof titles] || `${topic} - ${keyword} Analysis`
+}
+
 interface Project {
   id: string
   name: string
