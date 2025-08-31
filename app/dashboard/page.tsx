@@ -447,8 +447,8 @@ export default function Dashboard() {
         console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
         
         try {
-          // Call the real AI scanning API
-          const scanResponse = await fetch('/api/mentions/scan', {
+          // Call the debug route first to see what's failing
+          const scanResponse = await fetch('/api/debug-scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -587,8 +587,8 @@ export default function Dashboard() {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
           try {
-                                             // Call the real AI scanning API
-           const scanResponse = await fetch('/api/mentions/scan', {
+                                             // Call the debug route first to see what's failing
+           const scanResponse = await fetch('/api/debug-scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
