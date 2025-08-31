@@ -1,0 +1,269 @@
+# Bug Tracking - AI Mentions Platform
+
+## Current Known Issues
+
+### **Status: 🟢 RESOLVED**
+
+---
+
+## **🔧 Database Schema Issues (RESOLVED)**
+
+### Issue #001: Missing scan_queue Table
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- PostgreSQL error: `column scan_queue.userId does not exist`
+- ScanQueue table not created during deployment
+- Internal fetch SSL errors when creating table
+
+**Root Cause:**
+- Prisma schema had relations but database table wasn't created
+- Internal fetch calls causing SSL version mismatch errors
+- Missing proper table creation in deployment process
+
+**Resolution:**
+- Created `/api/create-scan-queue` endpoint with proper table creation
+- Added direct database operations in status route to avoid internal fetch
+- Implemented auto-creation of scan_queue table when first accessed
+- Fixed foreign key constraints and indexes
+
+**Files Modified:**
+- `app/api/create-scan-queue/route.ts` (created)
+- `app/api/mentions/status/route.ts` (updated)
+- `prisma/schema.prisma` (updated relations)
+
+---
+
+### Issue #002: User ID Mismatch
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Projects not saving: `Foreign key constraint violated: brand_tracking_userId_fkey`
+- Session user ID different from database user ID
+- Authentication working but database operations failing
+
+**Root Cause:**
+- NextAuth session `user.id` was OAuth provider ID (e.g., `101733592328833522060`)
+- Database expected internal cuid ID (e.g., `cmexuux3300004nxsu7a81ofa`)
+- All API routes using session.user.id instead of database user.id
+
+**Resolution:**
+- Added user lookup by email in all API routes
+- Fetch actual database user.id for all operations
+- Consistent user identification across `/api/mentions/track`, `/api/mentions/status`, `/api/mentions/scan`
+
+**Files Modified:**
+- `app/api/mentions/track/route.ts` (updated)
+- `app/api/mentions/status/route.ts` (updated)  
+- `app/api/mentions/scan/route.ts` (updated)
+- `lib/auth.ts` (enhanced logging)
+
+---
+
+### Issue #003: Invalid Date Conversion
+**Date:** 2025-01-31  
+**Severity:** Medium  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Frontend error: `RangeError: Invalid time value at Date.toISOString`
+- Projects loading but crashing on date conversion
+- Empty project list due to date conversion failures
+
+**Root Cause:**
+- Database returning null values for `createdAt` or `updatedAt`
+- Frontend trying to convert null dates to ISO strings
+- No null checks in date conversion logic
+
+**Resolution:**
+- Added null checks for all date conversions in dashboard
+- Fallback to current date if database dates are null
+- Graceful handling of missing timestamps
+
+**Files Modified:**
+- `app/dashboard/page.tsx` (updated date handling)
+
+---
+
+### Issue #004: TypeScript Error Handling
+**Date:** 2025-01-31  
+**Severity:** Low  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Linter errors: `'error' is of type 'unknown'`
+- TypeScript compilation warnings around error handling
+- Missing proper type casting for error objects
+
+**Root Cause:**
+- Modern TypeScript `catch` blocks receive `unknown` type
+- Direct access to `.message` and `.name` properties without type checking
+- Missing proper error type guards
+
+**Resolution:**
+- Added proper type casting: `(error as Error)?.message`
+- Used optional chaining for safe property access
+- Maintained error handling robustness
+
+**Files Modified:**
+- `app/dashboard/page.tsx` (updated error handling)
+
+---
+
+## **🟡 MONITORING (No Current Issues)**
+
+### Areas Under Observation:
+
+#### **AI API Integration**
+- **Monitor:** API rate limits and response times
+- **Watch for:** 401 Unauthorized, 429 Rate Limited, timeout errors
+- **Last Status:** ✅ All APIs responding correctly (gpt-5, sonar-pro, gemini-2.5-flash)
+
+#### **Database Performance** 
+- **Monitor:** Query performance and connection stability
+- **Watch for:** Slow queries, connection timeouts, foreign key violations
+- **Last Status:** ✅ All queries under 200ms, connections stable
+
+#### **Render Deployment**
+- **Monitor:** Build times, cold starts, memory usage
+- **Watch for:** Build failures, out of memory errors, long cold starts
+- **Last Status:** ✅ Paid tier eliminates cold start issues
+
+#### **Project Persistence**
+- **Monitor:** Project saving and loading functionality
+- **Watch for:** Projects disappearing, save failures, load errors
+- **Last Status:** ✅ Projects persist correctly with retry logic
+
+---
+
+## **📋 Bug Reporting Template**
+
+### For New Issues:
+
+```markdown
+### Issue #XXX: [Brief Description]
+**Date:** YYYY-MM-DD  
+**Severity:** [Low/Medium/High/Critical]  
+**Status:** 🔴 OPEN
+
+**Description:**
+[Detailed description of the issue]
+
+**Steps to Reproduce:**
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+**Expected Behavior:**
+[What should happen]
+
+**Actual Behavior:**
+[What actually happens]
+
+**Error Messages/Logs:**
+```
+[Paste error messages here]
+```
+
+**Root Cause:**
+[Analysis of why this happened]
+
+**Resolution:**
+[How it was fixed]
+
+**Files Modified:**
+- `file1.ts` (description)
+- `file2.tsx` (description)
+
+**Prevention:**
+[How to prevent this in future]
+```
+
+---
+
+## **🔍 Debugging Guidelines**
+
+### **Database Issues**
+1. Check `/api/db-check` for table existence
+2. Verify user ID consistency with `/api/debug-user-id`
+3. Test individual table operations with respective debug endpoints
+
+### **Authentication Issues**
+1. Check session validity with `/api/debug-auth`
+2. Verify user creation in database
+3. Compare session.user.id vs database user.id
+
+### **API Integration Issues**
+1. Test environment variables with `/api/check-env`
+2. Verify API keys are set in Render environment
+3. Check API response formats and rate limits
+
+### **Frontend Issues**
+1. Check browser console for JavaScript errors
+2. Verify network requests in Developer Tools
+3. Test with different browsers and devices
+
+---
+
+## **🚨 Emergency Procedures**
+
+### **Critical Database Corruption**
+1. **Immediate Action:** Disable new user registrations
+2. **Assessment:** Use `/api/db-check` to assess damage
+3. **Recovery:** Use backup or run schema migration
+4. **Verification:** Test all CRUD operations
+
+### **API Service Outages**
+1. **Immediate Action:** Display maintenance message
+2. **Fallback:** Switch to cached results if available
+3. **Monitoring:** Check service status pages
+4. **Recovery:** Test all AI integrations before re-enabling
+
+### **Authentication Failures**
+1. **Immediate Action:** Check NextAuth configuration
+2. **Diagnosis:** Verify OAuth provider status
+3. **Fallback:** Enable email/password if OAuth fails
+4. **Recovery:** Test login flow end-to-end
+
+---
+
+## **📈 Success Metrics**
+
+### **Error Rate Targets**
+- **Database Errors:** < 0.1% of operations
+- **API Failures:** < 1% of requests  
+- **Authentication Failures:** < 0.5% of attempts
+- **Page Load Failures:** < 0.1% of visits
+
+### **Performance Targets**
+- **Page Load Time:** < 3 seconds
+- **API Response Time:** < 2 seconds
+- **Database Query Time:** < 200ms
+- **AI Scan Completion:** < 30 seconds
+
+### **Monitoring Tools**
+- **Error Tracking:** Server logs and console errors
+- **Performance:** Network tab and server response times
+- **User Experience:** Manual testing and user feedback
+- **Uptime:** Render deployment status and health checks
+
+---
+
+## **📝 Change Log**
+
+### **2025-01-31**
+- ✅ **RESOLVED:** scan_queue table creation issues
+- ✅ **RESOLVED:** User ID mismatch causing foreign key violations
+- ✅ **RESOLVED:** Invalid date conversion errors
+- ✅ **RESOLVED:** TypeScript error handling issues
+- ✅ **DEPLOYED:** Comprehensive AI scanning fix
+- 📄 **CREATED:** Bug tracking documentation system
+
+---
+
+*Last Updated: 2025-01-31*  
+*Next Review: 2025-02-07*
