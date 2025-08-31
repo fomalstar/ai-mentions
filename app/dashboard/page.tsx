@@ -368,7 +368,7 @@ export default function Dashboard() {
     )
   }
 
-  const calculateBrandPosition = (response: string, brandName: string): number => {
+  const calculateBrandPosition = (response: string, brandName: string): number | null => {
     if (!response || !brandName) return null
     
     const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0)
@@ -453,8 +453,8 @@ export default function Dashboard() {
             
             // Simulate finding brand mention (70% chance)
             const hasMention = Math.random() > 0.3
-            let position = null
-            let mentionType = 'neutral'
+            let position: number | null = null
+            let mentionType: 'positive' | 'negative' | 'neutral' = 'neutral'
             
             if (hasMention) {
               position = Math.floor(Math.random() * 5) + 1
@@ -596,10 +596,10 @@ export default function Dashboard() {
         const project = projects.find(p => p.id === projectId)
         if (!project) continue
         
-        console.log(`Scanning project: ${project.name} with ${trackingItems.length} topics`)
+        console.log(`Scanning project: ${project.name} with ${(trackingItems as any[]).length} topics`)
         
         // Scan each topic for this project
-        for (const trackingItem of trackingItems) {
+        for (const trackingItem of trackingItems as any[]) {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
           for (const platform of platforms) {

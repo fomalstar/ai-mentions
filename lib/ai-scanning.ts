@@ -3,10 +3,9 @@
  * Handles scanning across ChatGPT, Perplexity, and Gemini for brand mentions
  */
 
-import { perplexityClient } from './perplexity'
 import { prisma } from './prisma'
 
-export interface ScanRequest {
+interface ScanRequest {
   userId: string
   brandTrackingId: string
   keywordTrackingId: string
@@ -15,28 +14,20 @@ export interface ScanRequest {
   topic: string
 }
 
-export interface BrandMention {
-  brandName: string
-  position: number | null
-  confidence: number
-  context: string
-}
-
-export interface ScanResult {
-  platform: 'chatgpt' | 'perplexity' | 'gemini'
-  query: string
+interface ScanResult {
+  platform: string
   brandMentioned: boolean
   position: number | null
   responseText: string
-  brandContext: string | null
   sourceUrls: Array<{
     url: string
     domain: string
     title: string
     date?: string
   }>
-  confidence: number
   scanDuration: number
+  confidence: number
+  brandContext?: string | null
 }
 
 export class AIScanningService {
@@ -46,376 +37,364 @@ export class AIScanningService {
   async scanKeyword(request: ScanRequest): Promise<ScanResult[]> {
     const results: ScanResult[] = []
     
-    console.log(`🔍 Starting AI scan for: ${request.brandName} - ${request.keyword} - ${request.topic}`)
+    // Scan each platform
+    const platforms = [
+      { name: 'perplexity', method: this.scanPerplexity.bind(this) },
+      { name: 'chatgpt', method: this.scanChatGPT.bind(this) },
+      { name: 'gemini', method: this.scanGemini.bind(this) }
+    ]
     
-    try {
-      // Scan Perplexity (we have the API ready)
-      console.log('📡 Scanning Perplexity...')
-      const perplexityResult = await this.scanPerplexity(request)
-      results.push(perplexityResult)
-      console.log(`✅ Perplexity scan complete: ${perplexityResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${perplexityResult.position}`)
-      
-      // Scan ChatGPT using OpenAI API
-      console.log('📡 Scanning ChatGPT...')
-      const chatgptResult = await this.scanChatGPT(request)
-      results.push(chatgptResult)
-      console.log(`✅ ChatGPT scan complete: ${chatgptResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${chatgptResult.position}`)
-      
-      // Scan Gemini using Google Gemini API
-      console.log('📡 Scanning Gemini...')
-      const geminiResult = await this.scanGemini(request)
-      results.push(geminiResult)
-      console.log(`✅ Gemini scan complete: ${geminiResult.brandMentioned ? 'Brand mentioned' : 'No mention'} at position ${geminiResult.position}`)
-      
-      // Store results in database
-      console.log('💾 Storing results in database...')
+    for (const platform of platforms) {
       try {
-        await this.storeResults(request, results)
-        console.log('✅ Results stored successfully')
+        console.log(`🚀 Starting ${platform.name.toUpperCase()} scan for topic: "${request.topic}"`)
+        const startTime = Date.now()
+        
+        const result = await platform.method(request)
+        result.scanDuration = Date.now() - startTime
+        
+        results.push(result)
+        console.log(`✅ ${platform.name.toUpperCase()} scan completed in ${result.scanDuration}ms`)
+        
       } catch (error) {
-        console.warn('⚠️ Could not store scan results:', error.message)
+        console.error(`❌ ${platform.name.toUpperCase()} scan failed:`, error)
+        // Create error result
+        results.push({
+          platform: platform.name,
+          brandMentioned: false,
+          position: null,
+          responseText: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          sourceUrls: [],
+          scanDuration: 0,
+          confidence: 0,
+          brandContext: null
+        })
       }
-      
-      // Update keyword tracking metrics
-      console.log('📊 Updating keyword metrics...')
-      try {
-        await this.updateKeywordMetrics(request.keywordTrackingId, results)
-        console.log('✅ Metrics updated successfully')
-      } catch (error) {
-        console.warn('⚠️ Could not update keyword metrics:', error.message)
-      }
-      
-      console.log(`🎯 Scan complete! Found mentions in ${results.filter(r => r.brandMentioned).length} out of ${results.length} platforms`)
-      return results
-    } catch (error) {
-      console.error('❌ AI scanning error:', error)
-      throw error
     }
+    
+    return results
   }
 
   /**
-   * Scan Perplexity AI for brand mentions
+   * Scan using Perplexity AI with latest sonar-pro model
    */
   private async scanPerplexity(request: ScanRequest): Promise<ScanResult> {
     const startTime = Date.now()
-    const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // Step 1: Get initial response from Perplexity
-      console.log(`🔍 Perplexity Query: ${query}`)
-      const initialResponse = await perplexityClient.getRealTimeInsights(query)
-      console.log(`📝 Perplexity Response: ${initialResponse.substring(0, 200)}...`)
+      console.log(`🔍 Querying Perplexity with topic: "${request.topic}" and brand: "${request.brandName}"`)
       
-      // Step 2: Analyze the response for brand mentions
-      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
-      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'user',
+              content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+            }
+          ]
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ Perplexity API error: ${response.status} - ${errorText}`)
+        throw new Error(`Perplexity API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(`✅ Perplexity response received in ${Date.now() - startTime}ms`)
       
-      // Step 3: If brand is mentioned, ask for source URLs
-      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
-      if (analysis.brandMentioned) {
-        console.log('🔗 Requesting source URLs from Perplexity...')
-        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
-        try {
-          const sourceResponse = await perplexityClient.getRealTimeInsights(sourceQuery)
-          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
-          sourceUrls = this.extractSourceUrls(sourceResponse)
-          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
-        } catch (sourceError) {
-          console.warn('Failed to get source URLs from Perplexity:', sourceError)
-          // Fallback to basic URL extraction from initial response
-          sourceUrls = this.extractSourceUrls(initialResponse)
-          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
-        }
+      const responseText = data.choices?.[0]?.message?.content || ''
+      const searchResults = data.search_results || []
+      
+      console.log(`📊 Perplexity search results: ${searchResults.length} found`)
+      
+      // Analyze brand mention
+      const analysis = this.analyzeBrandMention(responseText, request.brandName)
+      
+      // Extract source URLs from search results
+      const sourceUrls = searchResults.map((result: any) => ({
+        url: result.url,
+        domain: new URL(result.url).hostname,
+        title: result.title,
+        date: result.date || result.last_updated
+      }))
+      
+      // If no search results, try to extract URLs from response text
+      if (sourceUrls.length === 0) {
+        const extractedUrls = this.extractUrlsFromText(responseText)
+        sourceUrls.push(...extractedUrls)
       }
       
       return {
         platform: 'perplexity',
-        query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: initialResponse,
-        brandContext: analysis.context,
+        responseText,
         sourceUrls,
+        scanDuration: Date.now() - startTime,
         confidence: analysis.confidence,
-        scanDuration: Date.now() - startTime
+        brandContext: analysis.context
       }
+      
     } catch (error) {
-      console.error('Perplexity scanning error:', error)
+      console.error(`❌ Perplexity scan failed:`, error)
       throw error
     }
   }
 
   /**
-   * Scan ChatGPT for brand mentions using OpenAI API
+   * Scan using ChatGPT with latest gpt-5 model
    */
   private async scanChatGPT(request: ScanRequest): Promise<ScanResult> {
     const startTime = Date.now()
-    const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // Step 1: Get initial response from ChatGPT
-      console.log(`🔍 ChatGPT Query: ${query}`)
-      const initialResponse = await this.queryChatGPT(query)
-      console.log(`📝 ChatGPT Response: ${initialResponse.substring(0, 200)}...`)
+      console.log(`🔍 Querying ChatGPT with topic: "${request.topic}" and brand: "${request.brandName}"`)
       
-      // Step 2: Analyze the response for brand mentions
-      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
-      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
-      
-      // Step 3: If brand is mentioned, ask for source URLs
-      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
-      if (analysis.brandMentioned) {
-        console.log('🔗 Requesting source URLs from ChatGPT...')
-        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
-        try {
-          const sourceResponse = await this.queryChatGPT(sourceQuery)
-          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
-          sourceUrls = this.extractSourceUrls(sourceResponse)
-          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
-        } catch (sourceError) {
-          console.warn('Failed to get source URLs from ChatGPT:', sourceError)
-          // Fallback to basic URL extraction from initial response
-          sourceUrls = this.extractSourceUrls(initialResponse)
-          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
-        }
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-5',
+          messages: [
+            {
+              role: 'user',
+              content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ ChatGPT API error: ${response.status} - ${errorText}`)
+        throw new Error(`ChatGPT API error: ${response.status}`)
       }
+
+      const data = await response.json()
+      console.log(`✅ ChatGPT response received in ${Date.now() - startTime}ms`)
+      
+      const responseText = data.choices?.[0]?.message?.content || ''
+      
+      // Analyze brand mention
+      const analysis = this.analyzeBrandMention(responseText, request.brandName)
+      
+      // Extract URLs from response text
+      const sourceUrls = this.extractUrlsFromText(responseText)
       
       return {
         platform: 'chatgpt',
-        query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: initialResponse,
-        brandContext: analysis.context,
+        responseText,
         sourceUrls,
+        scanDuration: Date.now() - startTime,
         confidence: analysis.confidence,
-        scanDuration: Date.now() - startTime
+        brandContext: analysis.context
       }
+      
     } catch (error) {
-      console.error('ChatGPT scanning error:', error)
+      console.error(`❌ ChatGPT scan failed:`, error)
       throw error
     }
   }
 
   /**
-   * Scan Gemini for brand mentions using Google Gemini API
+   * Scan using Gemini with latest gemini-2.5-flash model
    */
   private async scanGemini(request: ScanRequest): Promise<ScanResult> {
     const startTime = Date.now()
-    const query = this.buildQuery(request.topic, request.brandName)
     
     try {
-      // Step 1: Get initial response from Gemini
-      console.log(`🔍 Gemini Query: ${query}`)
-      const initialResponse = await this.queryGemini(query)
-      console.log(`📝 Gemini Response: ${initialResponse.substring(0, 200)}...`)
+      console.log(`🔍 Querying Gemini with topic: "${request.topic}" and brand: "${request.brandName}"`)
       
-      // Step 2: Analyze the response for brand mentions
-      const analysis = await this.analyzeBrandMention(initialResponse, request.brandName)
-      console.log(`🔍 Brand Analysis: ${analysis.brandMentioned ? 'MENTIONED' : 'NOT MENTIONED'} at position ${analysis.position}`)
-      
-      // Step 3: If brand is mentioned, ask for source URLs
-      let sourceUrls: Array<{url: string, domain: string, title: string, date?: string}> = []
-      if (analysis.brandMentioned) {
-        console.log('🔗 Requesting source URLs from Gemini...')
-        const sourceQuery = `For your previous response about ${request.topic}, please provide the specific URLs and sources you used to get this information. List each source with its URL, domain name, and title.`
-        try {
-          const sourceResponse = await this.queryGemini(sourceQuery)
-          console.log(`📝 Source Response: ${sourceResponse.substring(0, 200)}...`)
-          sourceUrls = this.extractSourceUrls(sourceResponse)
-          console.log(`🔗 Extracted ${sourceUrls.length} source URLs`)
-        } catch (sourceError) {
-          console.warn('Failed to get source URLs from Gemini:', sourceError)
-          // Fallback to basic URL extraction from initial response
-          sourceUrls = this.extractSourceUrls(initialResponse)
-          console.log(`🔗 Fallback: Extracted ${sourceUrls.length} source URLs from initial response`)
-        }
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: 2000,
+            temperature: 0.7
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ Gemini API error: ${response.status} - ${errorText}`)
+        throw new Error(`Gemini API error: ${response.status}`)
       }
+
+      const data = await response.json()
+      console.log(`✅ Gemini response received in ${Date.now() - startTime}ms`)
+      
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      // Analyze brand mention
+      const analysis = this.analyzeBrandMention(responseText, request.brandName)
+      
+      // Extract URLs from response text
+      const sourceUrls = this.extractUrlsFromText(responseText)
       
       return {
         platform: 'gemini',
-        query,
         brandMentioned: analysis.brandMentioned,
         position: analysis.position,
-        responseText: initialResponse,
-        brandContext: analysis.context,
+        responseText,
         sourceUrls,
+        scanDuration: Date.now() - startTime,
         confidence: analysis.confidence,
-        scanDuration: Date.now() - startTime
+        brandContext: analysis.context
       }
+      
     } catch (error) {
-      console.error('Gemini scanning error:', error)
+      console.error(`❌ Gemini scan failed:`, error)
       throw error
     }
   }
 
   /**
-   * Query ChatGPT using OpenAI API
+   * Analyze brand mention in AI response
    */
-  private async queryChatGPT(query: string): Promise<string> {
-    try {
-      const response = await fetch('/api/openai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: query,
-          model: 'gpt-4',
-          maxTokens: 1000
-        })
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`ChatGPT API error: ${response.status} - ${errorText}`)
-      }
-      
-      const data = await response.json()
-      if (!data.response) {
-        throw new Error('No response from ChatGPT API')
-      }
-      return data.response
-    } catch (error) {
-      console.error('ChatGPT query error:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Query Gemini using Google Gemini API
-   */
-  private async queryGemini(query: string): Promise<string> {
-    try {
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: query,
-          model: 'gemini-pro',
-          maxTokens: 1000
-        })
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
-      }
-      
-      const data = await response.json()
-      if (!data.response) {
-        throw new Error('No response from Gemini API')
-      }
-      return data.response
-    } catch (error) {
-      console.error('Gemini query error:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Build an effective query for AI platforms
-   */
-  private buildQuery(topic: string, brandName: string): string {
-    // Create specific queries for search engines and other topics
-    if (topic.toLowerCase().includes('search engine') || topic.toLowerCase().includes('search engines')) {
-      return `What are the best search engines available today? Please provide a comprehensive list with brief descriptions of each search engine's features and strengths.`
-    }
-    
-    if (topic.toLowerCase().includes('yandex')) {
-      return `Tell me about Yandex search engine. What are its features, how does it compare to other search engines, and what makes it unique?`
-    }
-    
-    // Generic queries for other topics
-    const queries = [
-      `What are the best ${topic}? Please provide a comprehensive list with brief descriptions.`,
-      `Compare different ${topic} options and tell me which ones are most popular or recommended.`,
-      `Which ${topic} would you recommend for businesses? Please explain your reasoning.`,
-      `Give me reviews and comparisons of ${topic} tools and platforms.`,
-      `What are the top ${topic} platforms available today? Please rank them by popularity or effectiveness.`
-    ]
-    
-    // Select the most appropriate query based on the topic
-    return queries[0]
-  }
-
-  /**
-   * Analyze response text for brand mentions and extract position
-   */
-  private async analyzeBrandMention(responseText: string, brandName: string): Promise<{
+  private analyzeBrandMention(responseText: string, brandName: string): {
     brandMentioned: boolean
     position: number | null
-    context: string | null
     confidence: number
-  }> {
-    // Simple brand mention detection
-    const lowerResponse = responseText.toLowerCase()
-    const lowerBrand = brandName.toLowerCase()
+    context: string | null
+  } {
+    if (!responseText || !brandName) {
+      return { brandMentioned: false, position: null, confidence: 0, context: null }
+    }
+
+    const normalizedResponse = responseText.toLowerCase()
+    const normalizedBrand = brandName.toLowerCase()
     
     // Check if brand is mentioned
-    const brandMentioned = lowerResponse.includes(lowerBrand)
+    if (!normalizedResponse.includes(normalizedBrand)) {
+      return { brandMentioned: false, position: null, confidence: 0, context: null }
+    }
+
+    // Find position of brand mention
+    const sentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 0)
+    let position: number | null = null
+    let context: string | null = null
     
-    if (!brandMentioned) {
-      return {
-        brandMentioned: false,
-        position: null,
-        context: null,
-        confidence: 0
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i]
+      if (sentence.toLowerCase().includes(normalizedBrand)) {
+        position = i + 1
+        context = sentence.trim()
+        break
       }
     }
-    
-    // Extract context around the brand mention
-    const brandIndex = lowerResponse.indexOf(lowerBrand)
-    const contextStart = Math.max(0, brandIndex - 100)
-    const contextEnd = Math.min(responseText.length, brandIndex + lowerBrand.length + 100)
-    const context = responseText.substring(contextStart, contextEnd)
-    
-    // Determine position by analyzing the text structure
-    const position = this.determineBrandPosition(responseText, brandName)
-    
+
     // Calculate confidence based on context
-    const confidence = this.calculateConfidence(context, brandName)
+    const confidence = this.calculateConfidence(responseText, brandName)
     
     return {
       brandMentioned: true,
       position,
-      context,
-      confidence
+      confidence,
+      context
     }
   }
 
   /**
-   * Determine the position of the brand in the response
+   * Calculate confidence score for brand mention
    */
-  private determineBrandPosition(responseText: string, brandName: string): number | null {
-    const lines = responseText.split('\n')
-    const lowerBrand = brandName.toLowerCase()
+  private calculateConfidence(responseText: string, brandName: string): number {
+    let score = 0.5 // Base score
     
-    // Look for numbered lists or bullet points
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase()
-      if (line.includes(lowerBrand)) {
-        // Check if it's in a numbered list
-        const numberMatch = line.match(/^\s*(\d+)/)
-        if (numberMatch) {
-          return parseInt(numberMatch[1])
-        }
+    const positiveKeywords = ['best', 'excellent', 'amazing', 'great', 'top', 'premium', 'quality', 'recommended', 'outstanding', 'superior', 'leading', 'innovative']
+    const negativeKeywords = ['worst', 'bad', 'poor', 'terrible', 'avoid', 'disappointing', 'inferior', 'subpar', 'unreliable']
+    
+    const text = responseText.toLowerCase()
+    
+    // Check for positive indicators
+    positiveKeywords.forEach(keyword => {
+      if (text.includes(keyword)) score += 0.1
+    })
+    
+    // Check for negative indicators
+    negativeKeywords.forEach(keyword => {
+      if (text.includes(keyword)) score -= 0.1
+    })
+    
+    // Check for specific mention patterns
+    if (text.includes(`"${brandName}"`)) score += 0.2
+    if (text.includes(`'${brandName}'`)) score += 0.2
+    
+    return Math.max(0, Math.min(1, score))
+  }
+
+  /**
+   * Extract URLs from text
+   */
+  private extractUrlsFromText(text: string): Array<{ url: string, domain: string, title: string, date?: string }> {
+    const urlRegex = /https?:\/\/([^\s]+)/g
+    const urls: Array<{ url: string, domain: string, title: string, date?: string }> = []
+    
+    let match
+    while ((match = urlRegex.exec(text)) !== null) {
+      try {
+        const url = match[0]
+        const domain = new URL(url).hostname
+        const title = this.extractTitleFromUrl(url, text)
         
-        // Check if it's early in the response (top 3 positions)
-        if (i < 3) {
-          return i + 1
-        }
-        
-        // Check for bullet points or other list indicators
-        if (line.includes('•') || line.includes('-') || line.includes('*')) {
-          // Count previous list items to determine position
-          let listPosition = 1
-          for (let j = 0; j < i; j++) {
-            const prevLine = lines[j].toLowerCase()
-            if (prevLine.includes('•') || prevLine.includes('-') || prevLine.includes('*') || /^\s*\d+/.test(prevLine)) {
-              listPosition++
-            }
-          }
-          return listPosition
-        }
+        urls.push({
+          url,
+          domain,
+          title: title || `Content from ${domain}`,
+          date: new Date().toISOString().split('T')[0]
+        })
+      } catch (error) {
+        console.warn(`⚠️ Failed to parse URL: ${match[0]}`, error)
+      }
+    }
+    
+    return urls
+  }
+
+  /**
+   * Extract title from URL context
+   */
+  private extractTitleFromUrl(url: string, contextText: string): string | null {
+    const beforeText = contextText.substring(Math.max(0, contextText.indexOf(url) - 100))
+    const afterText = contextText.substring(contextText.indexOf(url) + url.length, contextText.indexOf(url) + url.length + 100)
+    
+    const titlePatterns = [
+      /"([^"]+)"/,           // Quoted text
+      /'([^']+)'/,           // Single quoted text
+      /\[([^\]]+)\]/,        // Bracket text
+      /([A-Z][^.!?]*[.!?])/  // Sentence starting with capital
+    ]
+    
+    for (const pattern of titlePatterns) {
+      const match = beforeText.match(pattern) || afterText.match(pattern)
+      if (match && match[1] && match[1].length > 10 && match[1].length < 100) {
+        return match[1].trim()
       }
     }
     
@@ -423,111 +402,9 @@ export class AIScanningService {
   }
 
   /**
-   * Calculate confidence score for brand mention
-   */
-  private calculateConfidence(context: string, brandName: string): number {
-    let confidence = 0.5 // Base confidence
-    
-    // Higher confidence if brand is mentioned with positive words
-    const positiveWords = ['best', 'top', 'excellent', 'recommended', 'great', 'popular', 'leading', 'powerful', 'innovative']
-    const negativeWords = ['poor', 'bad', 'avoid', 'worst', 'terrible', 'outdated', 'limited']
-    
-    const lowerContext = context.toLowerCase()
-    
-    positiveWords.forEach(word => {
-      if (lowerContext.includes(word)) confidence += 0.1
-    })
-    
-    negativeWords.forEach(word => {
-      if (lowerContext.includes(word)) confidence -= 0.2
-    })
-    
-    // Ensure confidence is between 0 and 1
-    return Math.max(0, Math.min(1, confidence))
-  }
-
-  /**
-   * Extract source URLs from response text
-   */
-  private extractSourceUrls(responseText: string): Array<{
-    url: string
-    domain: string
-    title: string
-    date?: string
-  }> {
-    const sources: Array<{url: string, domain: string, title: string, date?: string}> = []
-    
-    // Enhanced URL extraction with title parsing
-    const urlRegex = /https?:\/\/[^\s]+/g
-    const urls = responseText.match(urlRegex) || []
-    
-    console.log(`🔍 Found ${urls.length} URLs in response text`)
-    
-    // Try to extract titles from the text around URLs
-    urls.forEach((url, index) => {
-      try {
-        const domain = new URL(url).hostname
-        
-        // Look for title patterns around the URL
-        const urlIndex = responseText.indexOf(url)
-        const beforeText = responseText.substring(Math.max(0, urlIndex - 150), urlIndex)
-        const afterText = responseText.substring(urlIndex + url.length, Math.min(responseText.length, urlIndex + url.length + 150))
-        
-        // Try to find a title (look for quotes, dashes, or common patterns)
-        let title = domain
-        const titlePatterns = [
-          /[""]([^""]+)[""]/g,  // Quoted text
-          /[-–—]\s*([^.\n]+)/g,  // Text after dash
-          /:\s*([^.\n]+)/g,      // Text after colon
-          /([A-Z][^.\n]{5,50})/g // Capitalized phrases
-        ]
-        
-        for (const pattern of titlePatterns) {
-          const matches = [...beforeText.matchAll(pattern), ...afterText.matchAll(pattern)]
-          if (matches.length > 0) {
-            const match = matches[0][1]?.trim()
-            if (match && match.length > 5 && match.length < 100) {
-              title = match
-              break
-            }
-          }
-        }
-        
-        // If no title found, try to extract from surrounding text
-        if (title === domain) {
-          const surroundingText = beforeText + ' ' + afterText
-          const words = surroundingText.split(/\s+/).filter(word => word.length > 3)
-          if (words.length > 0) {
-            title = words.slice(0, 3).join(' ') + '...'
-          }
-        }
-        
-        sources.push({
-          url,
-          domain,
-          title: title.length > 100 ? title.substring(0, 100) + '...' : title,
-          date: new Date().toISOString()
-        })
-        
-        console.log(`🔗 URL ${index + 1}: ${domain} - ${title}`)
-      } catch (error) {
-        console.warn('Failed to parse URL:', url, error)
-      }
-    })
-    
-    // Remove duplicates and limit to 10 sources
-    const uniqueSources = sources.filter((source, index, self) => 
-      index === self.findIndex(s => s.url === source.url)
-    )
-    
-    console.log(`✅ Extracted ${uniqueSources.length} unique source URLs`)
-    return uniqueSources.slice(0, 10)
-  }
-
-  /**
    * Store scan results in database
    */
-  private async storeResults(request: ScanRequest, results: ScanResult[]): Promise<void> {
+  async storeScanResults(request: ScanRequest, results: ScanResult[]): Promise<void> {
     try {
       for (const result of results) {
         await prisma.scanResult.create({
@@ -536,63 +413,57 @@ export class AIScanningService {
             brandTrackingId: request.brandTrackingId,
             keywordTrackingId: request.keywordTrackingId,
             platform: result.platform,
-            query: result.query,
+            query: `${request.topic} - ${request.brandName}`,
             brandMentioned: result.brandMentioned,
             position: result.position,
             responseText: result.responseText,
             brandContext: result.brandContext,
             sourceUrls: result.sourceUrls,
-            confidence: result.confidence,
-            scanDuration: result.scanDuration
+            scanDuration: result.scanDuration,
+            confidence: result.confidence
           }
         })
       }
+      
+      // Update keyword tracking metrics
+      await this.updateKeywordMetrics(request.keywordTrackingId, results)
+      
     } catch (error) {
-      console.error('Error storing scan results:', error)
-      // Don't throw error to avoid breaking the scan process
+      console.error('Failed to store scan results:', error)
+      throw error
     }
   }
 
   /**
-   * Update keyword tracking metrics based on scan results
+   * Update keyword tracking metrics
    */
   private async updateKeywordMetrics(keywordTrackingId: string, results: ScanResult[]): Promise<void> {
     try {
-      // Calculate average position across platforms
-      const positions = results
-        .filter(r => r.position !== null)
-        .map(r => r.position as number)
-      
-      const avgPosition = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : null
-      
-      // Get current keyword tracking record
-      const currentKeyword = await prisma.keywordTracking.findUnique({
+      const keywordTracking = await prisma.keywordTracking.findUnique({
         where: { id: keywordTrackingId }
       })
       
-      if (currentKeyword) {
-        // Calculate position change
-        const positionChange = currentKeyword.avgPosition && avgPosition 
-          ? currentKeyword.avgPosition - avgPosition 
-          : null
-        
-        // Update the record
-        await prisma.keywordTracking.update({
-          where: { id: keywordTrackingId },
-          data: {
-            avgPosition,
-            positionChange,
-            chatgptPosition: results.find(r => r.platform === 'chatgpt')?.position || null,
-            perplexityPosition: results.find(r => r.platform === 'perplexity')?.position || null,
-            geminiPosition: results.find(r => r.platform === 'gemini')?.position || null,
-            lastScanAt: new Date(),
-            scanCount: { increment: 1 }
-          }
-        })
-      }
+      if (!keywordTracking) return
+      
+      const mentions = results.filter(r => r.brandMentioned)
+      const avgPosition = mentions.length > 0 
+        ? mentions.reduce((sum, r) => sum + (r.position || 0), 0) / mentions.length 
+        : null
+      
+      await prisma.keywordTracking.update({
+        where: { id: keywordTrackingId },
+        data: {
+          avgPosition,
+          chatgptPosition: results.find(r => r.platform === 'chatgpt')?.position || null,
+          perplexityPosition: results.find(r => r.platform === 'perplexity')?.position || null,
+          geminiPosition: results.find(r => r.platform === 'gemini')?.position || null,
+          lastScanAt: new Date(),
+          scanCount: { increment: 1 }
+        }
+      })
+      
     } catch (error) {
-      console.error('Error updating keyword metrics:', error)
-      // Don't throw error to avoid breaking the scan process
+      console.error('Failed to update keyword metrics:', error)
     }
   }
 }
