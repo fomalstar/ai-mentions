@@ -90,11 +90,33 @@ export async function GET(request: NextRequest) {
       })
     } catch (error) {
       console.warn('ScanQueue table not available yet:', error instanceof Error ? error.message : 'Unknown error')
-      // If scan_queue table doesn't exist, try to create it
+      // If scan_queue table doesn't exist, try to create it directly
       if (error instanceof Error && error.message.includes('does not exist')) {
-        console.log('🔧 Attempting to create scan_queue table...')
+        console.log('🔧 Attempting to create scan_queue table directly...')
         try {
-          await fetch(new URL('/api/create-scan-queue', request.url).toString())
+          // Create scan_queue table directly without internal fetch
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "scan_queue" (
+              "id" TEXT NOT NULL,
+              "userId" TEXT NOT NULL,
+              "brandTrackingId" TEXT NOT NULL,
+              "keywordTrackingId" TEXT,
+              "status" TEXT NOT NULL DEFAULT 'pending',
+              "priority" INTEGER NOT NULL DEFAULT 5,
+              "scheduledAt" TIMESTAMP(3) NOT NULL,
+              "startedAt" TIMESTAMP(3),
+              "completedAt" TIMESTAMP(3),
+              "attempts" INTEGER NOT NULL DEFAULT 0,
+              "maxAttempts" INTEGER NOT NULL DEFAULT 3,
+              "lastError" TEXT,
+              "scanType" TEXT NOT NULL,
+              "metadata" JSONB,
+              "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              CONSTRAINT "scan_queue_pkey" PRIMARY KEY ("id")
+            );
+          `)
+          console.log('✅ scan_queue table created successfully')
         } catch (createError) {
           console.warn('Failed to auto-create scan_queue table:', createError)
         }

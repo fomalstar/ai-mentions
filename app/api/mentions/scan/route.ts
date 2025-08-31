@@ -17,6 +17,25 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ User authenticated: ${session.user.id}`)
 
+    // Get the actual database user ID (not session ID)
+    let dbUser
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, email: true }
+      })
+      
+      if (!dbUser) {
+        console.error('❌ User not found in database for email:', session.user.email)
+        return NextResponse.json({ error: 'User not found in database' }, { status: 404 })
+      }
+      
+      console.log('🔍 Using database user ID:', dbUser.id, 'instead of session ID:', session.user.id)
+    } catch (userError) {
+      console.error('❌ Failed to find user in database:', userError)
+      return NextResponse.json({ error: 'Failed to find user in database' }, { status: 500 })
+    }
+
     const { brandTrackingId, keywordTrackingId, immediate = false } = await request.json()
     console.log(`📋 Request data:`, { brandTrackingId, keywordTrackingId, immediate })
     
@@ -36,7 +55,7 @@ export async function POST(request: NextRequest) {
       brandTracking = await prisma.brandTracking.findFirst({
         where: {
           id: brandTrackingId,
-          userId: session.user.id
+          userId: dbUser.id  // Use database user ID
         },
         include: {
           keywordTracking: {
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
           }
           
           const scanResults = await aiScanningService.scanKeyword({
-            userId: session.user.id,
+            userId: dbUser.id,  // Use database user ID
             brandTrackingId: brandTracking.id,
             keywordTrackingId: keyword.id,
             brandName: brandTracking.displayName,

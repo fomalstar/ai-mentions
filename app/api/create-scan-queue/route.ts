@@ -13,59 +13,74 @@ export async function GET(request: NextRequest) {
 
     console.log('🚀 Creating scan_queue table if it doesn\'t exist...')
 
-    // Try to push the schema to ensure all tables exist
-    try {
-      // This will create the scan_queue table based on our Prisma schema
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "scan_queue" (
-          "id" TEXT NOT NULL,
-          "userId" TEXT NOT NULL,
-          "brandTrackingId" TEXT NOT NULL,
-          "keywordTrackingId" TEXT,
-          "status" TEXT NOT NULL DEFAULT 'pending',
-          "priority" INTEGER NOT NULL DEFAULT 5,
-          "scheduledAt" TIMESTAMP(3) NOT NULL,
-          "startedAt" TIMESTAMP(3),
-          "completedAt" TIMESTAMP(3),
-          "attempts" INTEGER NOT NULL DEFAULT 0,
-          "maxAttempts" INTEGER NOT NULL DEFAULT 3,
-          "lastError" TEXT,
-          "scanType" TEXT NOT NULL,
-          "metadata" JSONB,
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          // Try to create the scan_queue table with proper schema
+      try {
+        // Drop table if exists to ensure clean creation
+        await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "scan_queue";`)
+        
+        // Create the scan_queue table based on our Prisma schema
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE "scan_queue" (
+            "id" TEXT NOT NULL,
+            "userId" TEXT NOT NULL,
+            "brandTrackingId" TEXT NOT NULL,
+            "keywordTrackingId" TEXT,
+            "status" TEXT NOT NULL DEFAULT 'pending',
+            "priority" INTEGER NOT NULL DEFAULT 5,
+            "scheduledAt" TIMESTAMP(3) NOT NULL,
+            "startedAt" TIMESTAMP(3),
+            "completedAt" TIMESTAMP(3),
+            "attempts" INTEGER NOT NULL DEFAULT 0,
+            "maxAttempts" INTEGER NOT NULL DEFAULT 3,
+            "lastError" TEXT,
+            "scanType" TEXT NOT NULL,
+            "metadata" JSONB,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-          CONSTRAINT "scan_queue_pkey" PRIMARY KEY ("id")
-        );
-      `)
+            CONSTRAINT "scan_queue_pkey" PRIMARY KEY ("id")
+          );
+        `)
 
-      // Add indexes
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "scan_queue_status_scheduledAt_idx" ON "scan_queue"("status", "scheduledAt");
-      `)
-      
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS "scan_queue_userId_idx" ON "scan_queue"("userId");
-      `)
+        // Add indexes
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX "scan_queue_status_scheduledAt_idx" ON "scan_queue"("status", "scheduledAt");
+        `)
+        
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX "scan_queue_userId_idx" ON "scan_queue"("userId");
+        `)
 
-      // Add foreign key constraints
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE "scan_queue" 
-        ADD CONSTRAINT "scan_queue_userId_fkey" 
-        FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-      `)
+        // Add foreign key constraints (with error handling for existing constraints)
+        try {
+          await prisma.$executeRawUnsafe(`
+            ALTER TABLE "scan_queue" 
+            ADD CONSTRAINT "scan_queue_userId_fkey" 
+            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          `)
+        } catch (e) {
+          console.log('userId constraint might already exist:', e.message)
+        }
 
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE "scan_queue" 
-        ADD CONSTRAINT "scan_queue_brandTrackingId_fkey" 
-        FOREIGN KEY ("brandTrackingId") REFERENCES "brand_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-      `)
+        try {
+          await prisma.$executeRawUnsafe(`
+            ALTER TABLE "scan_queue" 
+            ADD CONSTRAINT "scan_queue_brandTrackingId_fkey" 
+            FOREIGN KEY ("brandTrackingId") REFERENCES "brand_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          `)
+        } catch (e) {
+          console.log('brandTrackingId constraint might already exist:', e.message)
+        }
 
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE "scan_queue" 
-        ADD CONSTRAINT "scan_queue_keywordTrackingId_fkey" 
-        FOREIGN KEY ("keywordTrackingId") REFERENCES "keyword_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-      `)
+        try {
+          await prisma.$executeRawUnsafe(`
+            ALTER TABLE "scan_queue" 
+            ADD CONSTRAINT "scan_queue_keywordTrackingId_fkey" 
+            FOREIGN KEY ("keywordTrackingId") REFERENCES "keyword_tracking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          `)
+        } catch (e) {
+          console.log('keywordTrackingId constraint might already exist:', e.message)
+        }
 
       console.log('✅ scan_queue table created successfully')
 
