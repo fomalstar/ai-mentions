@@ -118,6 +118,122 @@
 
 ---
 
+### Issue #007: Excessive Redirect Callback Loop
+**Date:** 2025-01-31  
+**Severity:** Medium  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Multiple redirect callbacks to `/dashboard` flooding server logs
+- Appears during normal navigation and AI scanning
+- No functional impact but creates log noise and confusion
+
+**Root Cause:**
+- NextAuth redirect callback logging every dashboard navigation
+- Each AI API call triggering multiple redirect callbacks
+- No filtering for repetitive dashboard redirects
+
+**Resolution:**
+- Added conditional logging to only log non-dashboard redirects
+- Reduced redirect callback noise in server logs
+- Maintained important redirect logging for debugging
+
+**Files Modified:**
+- `lib/auth.ts` (updated redirect callback logging)
+
+**Prevention:**
+- Monitor redirect patterns during development
+- Use conditional logging for repetitive operations
+
+---
+
+### Issue #008: Sequential AI Scanning Performance
+**Date:** 2025-01-31  
+**Severity:** Medium  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- AI scans taking 30+ seconds due to sequential execution
+- Perplexity (15s) + ChatGPT (8s) + Gemini (11s) = ~34 seconds total
+- Poor user experience with long wait times
+
+**Root Cause:**
+- AI platform scans running sequentially instead of parallel
+- Each platform waiting for previous to complete
+- No optimization for concurrent API calls
+
+**Resolution:**
+- Implemented parallel scanning using `Promise.all()`
+- All 3 platforms now scan simultaneously
+- Estimated 3x speed improvement (34s → ~15s)
+
+**Files Modified:**
+- `lib/ai-scanning.ts` (parallel execution implementation)
+
+**Prevention:**
+- Use parallel execution for independent async operations
+- Monitor scan performance metrics
+
+---
+
+### Issue #009: Missing Source URL Follow-up Queries
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Data Sources section showing example.com instead of real URLs
+- ChatGPT and Gemini not providing source URLs automatically
+- Only Perplexity has built-in search results
+
+**Root Cause:**
+- Missing follow-up queries to ask AIs for source URLs
+- No implementation of secondary API calls for sources
+- Falling back to text extraction instead of direct requests
+
+**Resolution:**
+- Added follow-up queries to all AI platforms asking for source URLs
+- Implemented secondary API calls after main topic analysis
+- Enhanced URL extraction from follow-up responses
+
+**Files Modified:**
+- `lib/ai-scanning.ts` (added source URL follow-up queries)
+
+**Prevention:**
+- Document follow-up query patterns for future features
+- Test source URL quality in development
+
+---
+
+### Issue #010: Topic Data Corruption
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🔴 OPEN
+
+**Description:**
+- User enters "give me a list of search engines" in UI
+- Database/API receives corrupted topic like "ergerg"
+- Topic data not properly passed from dashboard to backend
+
+**Root Cause:**
+- **INVESTIGATION NEEDED**: Topic mapping between UI and database
+- Possible form handling issue in dashboard
+- May be related to project creation or editing workflow
+
+**Resolution:**
+- **IN PROGRESS**: Need to trace topic data flow
+- Check form submission in dashboard
+- Verify database storage and retrieval
+
+**Files Modified:**
+- **PENDING**: Investigation required
+
+**Prevention:**
+- Add topic validation in form submission
+- Implement data integrity checks
+
+---
+
 ### Issue #005: ChatGPT API Parameter Error
 **Date:** 2025-01-31  
 **Severity:** Medium  

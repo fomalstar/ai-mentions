@@ -44,7 +44,11 @@ export class AIScanningService {
       { name: 'gemini', method: this.scanGemini.bind(this) }
     ]
     
-    for (const platform of platforms) {
+    console.log(`🚀 Starting PARALLEL scan for topic: "${request.topic}" across ${platforms.length} platforms`)
+    const overallStartTime = Date.now()
+    
+    // Run all platform scans in parallel for faster execution
+    const scanPromises = platforms.map(async (platform) => {
       try {
         console.log(`🚀 Starting ${platform.name.toUpperCase()} scan for topic: "${request.topic}"`)
         const startTime = Date.now()
@@ -52,13 +56,13 @@ export class AIScanningService {
         const result = await platform.method(request)
         result.scanDuration = Date.now() - startTime
         
-        results.push(result)
         console.log(`✅ ${platform.name.toUpperCase()} scan completed in ${result.scanDuration}ms`)
+        return result
         
       } catch (error) {
         console.error(`❌ ${platform.name.toUpperCase()} scan failed:`, error)
-        // Create error result
-        results.push({
+        // Return error result
+        return {
           platform: platform.name,
           brandMentioned: false,
           position: null,
@@ -67,11 +71,17 @@ export class AIScanningService {
           scanDuration: 0,
           confidence: 0,
           brandContext: null
-        })
+        }
       }
-    }
+    })
     
-    return results
+    // Wait for all scans to complete
+    results = await Promise.all(scanPromises)
+    const overallEndTime = Date.now()
+    
+    console.log(`✅ PARALLEL scan completed in ${overallEndTime - overallStartTime}ms (estimated ${Math.round((overallEndTime - overallStartTime) / 1000)}s vs ~${Math.round(results.reduce((sum, r) => sum + r.scanDuration, 0) / 1000)}s sequential)`)
+      
+      return results
   }
 
   /**
@@ -118,17 +128,44 @@ export class AIScanningService {
       const analysis = this.analyzeBrandMention(responseText, request.brandName)
       
       // Extract source URLs from search results
-      const sourceUrls = searchResults.map((result: any) => ({
+      let sourceUrls = searchResults.map((result: any) => ({
         url: result.url,
         domain: new URL(result.url).hostname,
         title: result.title,
         date: result.date || result.last_updated
       }))
       
-      // If no search results, try to extract URLs from response text
+      // If no search results, ask for source URLs as follow-up
       if (sourceUrls.length === 0) {
-        const extractedUrls = this.extractUrlsFromText(responseText)
-        sourceUrls.push(...extractedUrls)
+        console.log(`🔍 No search results from Perplexity, asking for source URLs...`)
+        try {
+          const sourceResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'sonar-pro',
+              messages: [
+                {
+                  role: 'user',
+                  content: `Can you provide source URLs for information about "${request.topic}"? Please list actual website URLs where this information can be found.`
+                }
+              ]
+            })
+          })
+          
+          if (sourceResponse.ok) {
+            const sourceData = await sourceResponse.json()
+            const sourceText = sourceData.choices?.[0]?.message?.content || ''
+            sourceUrls = this.extractUrlsFromText(sourceText)
+            console.log(`📌 Extracted ${sourceUrls.length} source URLs from follow-up query`)
+          }
+        } catch (error) {
+          console.warn('Failed to get source URLs from follow-up:', error)
+          sourceUrls = this.extractUrlsFromText(responseText)
+        }
       }
       
       return {
@@ -190,8 +227,39 @@ export class AIScanningService {
       // Analyze brand mention
       const analysis = this.analyzeBrandMention(responseText, request.brandName)
       
-      // Extract URLs from response text
-      const sourceUrls = this.extractUrlsFromText(responseText)
+      // Ask for source URLs as follow-up (ChatGPT doesn't provide them automatically)
+      let sourceUrls: any[] = []
+      console.log(`🔍 Asking ChatGPT for source URLs...`)
+      try {
+        const sourceResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'user',
+                content: `Can you provide source URLs for information about "${request.topic}"? Please list actual website URLs where this information can be found.`
+              }
+            ],
+            max_completion_tokens: 500,
+            temperature: 0.7
+          })
+        })
+        
+        if (sourceResponse.ok) {
+          const sourceData = await sourceResponse.json()
+          const sourceText = sourceData.choices?.[0]?.message?.content || ''
+          sourceUrls = this.extractUrlsFromText(sourceText)
+          console.log(`📌 Extracted ${sourceUrls.length} source URLs from ChatGPT follow-up`)
+        }
+      } catch (error) {
+        console.warn('Failed to get source URLs from ChatGPT follow-up:', error)
+        sourceUrls = this.extractUrlsFromText(responseText)
+      }
       
       return {
         platform: 'chatgpt',
@@ -224,7 +292,7 @@ export class AIScanningService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        body: JSON.stringify({ 
           contents: [
             {
               parts: [
@@ -240,13 +308,13 @@ export class AIScanningService {
           }
         })
       })
-
+      
       if (!response.ok) {
         const errorText = await response.text()
         console.error(`❌ Gemini API error: ${response.status} - ${errorText}`)
         throw new Error(`Gemini API error: ${response.status}`)
       }
-
+      
       const data = await response.json()
       console.log(`✅ Gemini response received in ${Date.now() - startTime}ms`)
       
@@ -309,7 +377,7 @@ export class AIScanningService {
         break
       }
     }
-
+    
     // Calculate confidence based on context
     const confidence = this.calculateConfidence(responseText, brandName)
     
@@ -442,14 +510,14 @@ export class AIScanningService {
       const keywordTracking = await prisma.keywordTracking.findUnique({
         where: { id: keywordTrackingId }
       })
-      
+
       if (!keywordTracking) return
       
       const mentions = results.filter(r => r.brandMentioned)
       const avgPosition = mentions.length > 0 
         ? mentions.reduce((sum, r) => sum + (r.position || 0), 0) / mentions.length 
         : null
-      
+
       await prisma.keywordTracking.update({
         where: { id: keywordTrackingId },
         data: {

@@ -159,7 +159,10 @@ export const authOptions: AuthOptions = {
       return true;
     },
     async redirect({ url, baseUrl }) {
-      console.log('🔄 Redirect callback:', { url, baseUrl });
+      // Only log redirects that are not to dashboard (reduce noise)
+      if (!url.includes('/dashboard')) {
+        console.log('🔄 Redirect callback:', { url, baseUrl });
+      }
       
       // Handle different redirect scenarios
       if (url.startsWith("/")) {
