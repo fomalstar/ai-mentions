@@ -19,17 +19,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Get brand tracking details
-    const brandTracking = await prisma.brandTracking.findFirst({
-      where: {
-        id: brandTrackingId,
-        userId: session.user.id
-      },
-      include: {
-        keywordTracking: {
-          where: keywordTrackingId ? { id: keywordTrackingId } : { isActive: true }
+    let brandTracking
+    try {
+      brandTracking = await prisma.brandTracking.findFirst({
+        where: {
+          id: brandTrackingId,
+          userId: session.user.id
+        },
+        include: {
+          keywordTracking: {
+            where: keywordTrackingId ? { id: keywordTrackingId } : { isActive: true }
+          }
         }
-      }
-    })
+      })
+    } catch (dbError) {
+      console.error('❌ Database connection error:', dbError)
+      return NextResponse.json({ 
+        error: 'Database connection failed',
+        details: dbError instanceof Error ? dbError.message : 'Unknown database error'
+      }, { status: 500 })
+    }
 
     if (!brandTracking) {
       return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
@@ -41,6 +50,13 @@ export async function POST(request: NextRequest) {
       
       for (const keyword of brandTracking.keywordTracking) {
         try {
+          console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${keyword.topic}`)
+          
+          // Check if required environment variables are set
+          if (!process.env.PERPLEXITY_API_KEY || !process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY) {
+            throw new Error('Missing required API keys for AI scanning')
+          }
+          
           const scanResults = await aiScanningService.scanKeyword({
             userId: session.user.id,
             brandTrackingId: brandTracking.id,
@@ -50,17 +66,33 @@ export async function POST(request: NextRequest) {
             topic: keyword.topic || keyword.keyword // Fallback if topic is missing
           })
           
+          console.log(`✅ AI scan completed for keyword: ${keyword.keyword}`)
+          
           results.push({
             keywordTrackingId: keyword.id,
             keyword: keyword.keyword,
             results: scanResults
           })
         } catch (error) {
-          console.error(`Scan error for keyword ${keyword.keyword}:`, error)
+          console.error(`❌ Scan error for keyword ${keyword.keyword}:`, error)
+          
+          // Create a fallback result instead of crashing
           results.push({
             keywordTrackingId: keyword.id,
             keyword: keyword.keyword,
-            error: 'Scan failed'
+            error: error instanceof Error ? error.message : 'Scan failed',
+            results: [
+              {
+                platform: 'error',
+                brandMentioned: false,
+                position: null,
+                responseText: `Scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                sourceUrls: [],
+                scanDuration: 0,
+                confidence: 0,
+                brandContext: null
+              }
+            ]
           })
         }
       }

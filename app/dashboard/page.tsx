@@ -587,15 +587,15 @@ export default function Dashboard() {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
           try {
-            // Call the real AI scanning API
-            const scanResponse = await fetch('/api/mentions/scan', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                brandTrackingId: projectId, 
-                immediate: true 
-              })
+                                             // Call the real AI scanning API
+           const scanResponse = await fetch('/api/mentions/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              brandTrackingId: projectId, 
+              immediate: true 
             })
+          })
             
             if (scanResponse.ok) {
               const scanData = await scanResponse.json()
