@@ -19,6 +19,9 @@ yarn-error.log*
 # env files
 .env*
 
+# API Keys Reference (contains real API keys)
+LOCAL_API_KEYS.md
+
 # vercel
 .vercel
 
