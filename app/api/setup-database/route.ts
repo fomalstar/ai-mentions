@@ -11,10 +11,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin (you can modify this logic)
-    if (session.user.email !== 'foma@example.com') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
+    // Allow any authenticated user to run database setup
+    console.log('🔐 User authorized for database setup:', session.user.email)
 
     console.log('🔄 Setting up enhanced mention tracking database...')
 
