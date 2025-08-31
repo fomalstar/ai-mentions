@@ -32,6 +32,7 @@ model User {
   brandTracking BrandTracking[]
   keywordTracking KeywordTracking[]
   scanResults  ScanResult[]
+  scanQueue    ScanQueue[]
 
   @@map("users")
 }
@@ -193,6 +194,7 @@ model BrandTracking {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   keywordTracking KeywordTracking[]
   scanResults     ScanResult[]
+  scanQueue       ScanQueue[]
 
   @@unique([userId, brandName])
   @@index([userId, isActive])
@@ -228,6 +230,7 @@ model KeywordTracking {
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   brandTracking   BrandTracking @relation(fields: [brandTrackingId], references: [id], onDelete: Cascade)
   scanResults     ScanResult[]
+  scanQueue       ScanQueue[]
 
   @@unique([brandTrackingId, keyword])
   @@index([userId, isActive])
@@ -293,6 +296,11 @@ model ScanQueue {
   metadata        Json?    // Additional scan parameters
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandTracking   BrandTracking @relation(fields: [brandTrackingId], references: [id], onDelete: Cascade)
+  keywordTracking KeywordTracking? @relation(fields: [keywordTrackingId], references: [id], onDelete: Cascade)
 
   @@index([status, scheduledAt])
   @@index([userId])
