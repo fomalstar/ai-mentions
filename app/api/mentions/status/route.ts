@@ -11,11 +11,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get the actual database user ID (not session ID)
+    let dbUser
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, email: true }
+      })
+      
+      if (!dbUser) {
+        console.error('❌ User not found in database for email:', session.user.email)
+        return NextResponse.json({ error: 'User not found in database' }, { status: 404 })
+      }
+      
+      console.log('🔍 Using database user ID:', dbUser.id, 'instead of session ID:', session.user.id)
+    } catch (userError) {
+      console.error('❌ Failed to find user in database:', userError)
+      return NextResponse.json({ error: 'Failed to find user in database' }, { status: 500 })
+    }
+
     const { searchParams } = new URL(request.url)
     const brandTrackingId = searchParams.get('brandTrackingId')
 
-    // Build where clause
-    const where: any = { userId: session.user.id }
+    // Build where clause with the real database user ID
+    const where: any = { userId: dbUser.id }
     if (brandTrackingId) {
       where.id = brandTrackingId
     }
@@ -58,7 +77,7 @@ export async function GET(request: NextRequest) {
     try {
       queueItems = await prisma.scanQueue.findMany({
         where: {
-          userId: session.user.id,
+          userId: dbUser.id,
           ...(brandTrackingId && { brandTrackingId }),
           status: { in: ['pending', 'running'] }
         },
@@ -78,7 +97,7 @@ export async function GET(request: NextRequest) {
     try {
       recentResults = await prisma.scanResult.findMany({
         where: {
-          userId: session.user.id,
+          userId: dbUser.id,
           ...(brandTrackingId && { brandTrackingId }),
           createdAt: {
             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
@@ -136,7 +155,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       stats,
-      brands: brandData,
+      brandTracking: brandData, // Frontend expects 'brandTracking' key
       queue: queueItems.map(item => ({
         id: item.id,
         brandName: item.brandTracking?.displayName,
