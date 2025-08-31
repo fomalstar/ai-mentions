@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
         for (const keyword of keywords) {
           const queueItem = await prisma.scanQueue.create({
             data: {
-              userId: session.user.id,
+              userId: dbUser.id,  // Use database user ID consistently
               brandTrackingId: brandTracking.id,
               keywordTrackingId: keyword.id,
               scheduledAt: new Date(),

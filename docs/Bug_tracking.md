@@ -114,6 +114,70 @@
 
 ---
 
+## **🔴 CURRENT OPEN ISSUES**
+
+---
+
+### Issue #005: ChatGPT API Parameter Error
+**Date:** 2025-01-31  
+**Severity:** Medium  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- ChatGPT API returning 400 error: `Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.`
+- All ChatGPT scans failing consistently
+- Perplexity and Gemini scans working correctly
+
+**Root Cause:**
+- OpenAI deprecated `max_tokens` parameter for newer models
+- Using `gpt-5` model which doesn't exist (should be `gpt-4o`)
+- API parameter naming changed in recent OpenAI API updates
+
+**Resolution:**
+- Changed `max_tokens` to `max_completion_tokens` in ChatGPT API call
+- Updated model from `gpt-5` to `gpt-4o` (available model)
+- Tested API call format with current OpenAI documentation
+
+**Files Modified:**
+- `lib/ai-scanning.ts` (updated ChatGPT API parameters)
+
+**Prevention:**
+- Monitor OpenAI API documentation for parameter changes
+- Use model availability endpoint to verify model names
+- Add API parameter validation before deployment
+
+---
+
+### Issue #006: Potential Scan Loop and User ID Mismatch
+**Date:** 2025-01-31  
+**Severity:** Medium  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Multiple redirect callbacks appearing in logs
+- Potential duplicate scan requests from dashboard
+- Queue creation using wrong user ID (session.user.id instead of dbUser.id)
+
+**Root Cause:**
+- Two similar functions in dashboard both calling scan API
+- Possible race condition when multiple scans initiated
+- Inconsistent user ID usage in queue creation vs scan processing
+
+**Resolution:**
+- Fixed user ID mismatch in scan queue creation
+- Updated queue to use `dbUser.id` consistently
+- Added debugging to identify dashboard scan call sources
+
+**Files Modified:**
+- `app/api/mentions/scan/route.ts` (fixed user ID in queue creation)
+
+**Prevention:**
+- Ensure all API routes use consistent user ID lookup pattern
+- Add request deduplication for scan operations
+- Monitor for duplicate API calls in dashboard functions
+
+---
+
 ## **🟡 MONITORING (No Current Issues)**
 
 ### Areas Under Observation:

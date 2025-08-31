@@ -164,14 +164,14 @@ export class AIScanningService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-5',
+          model: 'gpt-4o',  // Use available model instead of gpt-5
           messages: [
             {
               role: 'user',
               content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
             }
           ],
-          max_tokens: 2000,
+          max_completion_tokens: 2000,  // Use max_completion_tokens instead of max_tokens
           temperature: 0.7
         })
       })
