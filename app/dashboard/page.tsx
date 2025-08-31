@@ -45,6 +45,7 @@ import { EditProjectModal } from "@/components/edit-project-modal"
 import { MentionChart } from "@/components/mention-chart"
 import { AddKeywordModal } from "@/components/add-keyword-modal"
 import { AccountDropdown } from "@/components/account-dropdown"
+import { CleanupCorruptedData } from '@/components/cleanup-corrupted-data'
 
 // Utility functions for generating realistic data
 const getRealisticDomain = (platform: string): string => {
@@ -2708,6 +2709,7 @@ export default function Dashboard() {
         onAddKeyword={addManualKeywordTracking}
       />
 
+      <CleanupCorruptedData />
 
     </div>
   )
