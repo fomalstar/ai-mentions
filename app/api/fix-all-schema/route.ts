@@ -40,10 +40,10 @@ export async function GET(request: NextRequest) {
         if (!exists) {
           console.log(`🔧 Adding missing column: ${col.name}`)
           
-          await prisma.$executeRaw`
+          await prisma.$executeRawUnsafe(`
             ALTER TABLE keyword_tracking 
-            ADD COLUMN ${col.name} ${col.type}
-          ` as any
+            ADD COLUMN "${col.name}" ${col.type}
+          `)
           
           fixes.push(`Added column: ${col.name}`)
           console.log(`✅ Added ${col.name} column`)
@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
         if (positionChangeCol && positionChangeCol.data_type === 'integer') {
           console.log('🔧 Fixing positionChange data type from integer to double precision')
           
-          await prisma.$executeRaw`
+          await prisma.$executeRawUnsafe(`
             ALTER TABLE keyword_tracking 
             ALTER COLUMN "positionChange" TYPE DOUBLE PRECISION
-          ` as any
+          `)
           
           fixes.push('Fixed positionChange data type')
           console.log('✅ Fixed positionChange data type')
