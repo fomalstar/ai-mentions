@@ -205,58 +205,59 @@
 
 ---
 
-### Issue #010: Topic Data Corruption (CRITICAL)
+### Issue #010: Data Structure Misunderstanding (RESOLVED)
 **Date:** 2025-01-31  
-**Severity:** Critical  
-**Status:** 🔴 OPEN
+**Severity:** Low  
+**Status:** 🟢 RESOLVED
 
 **Description:**
-- User enters "how to make icecream" in UI
-- Database stores corrupted topics: "erge", "gre", "ewgerg", "ergerg"
-- This explains why position detection is wrong (searching for "Yandex" in "how to make icecream" topics)
+- Misunderstood data structure in logs
+- "ergerg" is the PROJECT NAME (not corrupted topic)
+- Topic "how to make icecream" is correctly processed
+- Brand "Yandex" correctly should NOT appear in icecream topic
 
 **Root Cause:**
-- **CONFIRMED**: Data corruption in database storage/retrieval
-- KeywordTracking table has corrupted topic field values
-- Project creation/editing not preserving topic integrity
-
-**Impact:**
-- All position analysis is meaningless with wrong topics
-- AI scans search for brand in unrelated topics
-- User experience completely broken
+- Developer misinterpretation of log data structure
+- Logs show project names in scan context, not corrupted topics
+- System working as intended
 
 **Resolution:**
-- **URGENT**: Fix topic field corruption in KeywordTracking table
-- Trace data flow from UI form submission to database storage
-- Add data validation and integrity checks
+- Clarified data structure understanding
+- Topic processing is working correctly
+- Position detection correctly returns null for irrelevant topics
 
-**Files Modified:**
-- **PENDING**: Full investigation required
+**Impact:**
+- No system changes needed
+- Position logic fixes are still valid and beneficial
 
-### Issue #011: Wrong Position Detection Logic (CRITICAL)
+### Issue #011: Wrong Position Detection Logic (RESOLVED)
 **Date:** 2025-01-31  
 **Severity:** Critical  
-**Status:** 🔴 OPEN
+**Status:** 🟢 RESOLVED
 
 **Description:**
-- Position detection counts sentences instead of ranking positions
-- Looking for "Yandex" in "how to make icecream" topic returns false positions
-- Should return null/not found for irrelevant topics
+- Position detection counted sentences instead of ranking positions
+- Looking for "Yandex" in "how to make icecream" topic should return null
+- Old logic gave false positive positions for irrelevant topics
 
 **Root Cause:**
-- Position logic counts sentence appearance (position = i + 1)
-- Should detect ranking positions in lists (1st, 2nd, 3rd place)
+- Position logic counted sentence appearance (position = i + 1)
+- Needed to detect ranking positions in lists (1st, 2nd, 3rd place)
 - No logic to return null for irrelevant brand mentions
 
 **Resolution:**
-- **URGENT**: Rewrite position detection for ranked lists
-- Add irrelevance detection (brand not relevant to topic)
-- Return null when brand shouldn't be mentioned in topic
+- ✅ **Rewrote position detection** for ranked lists only
+- ✅ **Added pattern matching** for numbered, ordinal, and comma lists
+- ✅ **Returns null** when brand not in ranking context
+- ✅ **Caps at top 10** positions for meaningful tracking
 
-### Issue #012: URL Extraction Returning example.com (CRITICAL)
+**Files Modified:**
+- `lib/ai-scanning.ts` (complete position detection rewrite)
+
+### Issue #012: URL Extraction Returning example.com (IN PROGRESS)
 **Date:** 2025-01-31  
-**Severity:** Critical  
-**Status:** 🔴 OPEN
+**Severity:** High  
+**Status:** 🟡 IN PROGRESS
 
 **Description:**
 - ChatGPT follow-up returns "📌 Extracted 0 source URLs"
@@ -269,9 +270,17 @@
 - Fallback to dummy URLs when extraction fails
 
 **Resolution:**
-- **URGENT**: Debug URL extraction regex and follow-up query responses
-- Log actual AI responses to see URL format
-- Fix extraction or improve follow-up query prompts
+- ✅ **Enhanced URL extraction** with multiple regex patterns
+- ✅ **Added extensive debugging** and logging
+- ✅ **Improved URL cleanup** and validation
+- 🔄 **Testing in progress** - need to verify with real AI responses
+
+**Files Modified:**
+- `lib/ai-scanning.ts` (enhanced URL extraction with debugging)
+
+**Next Steps:**
+- Monitor logs for actual AI response formats
+- Adjust extraction patterns based on real data
 
 ---
 
