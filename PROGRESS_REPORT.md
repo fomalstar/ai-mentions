@@ -346,3 +346,53 @@ pnpm run start                  # Start production server
 ```bash
 pnpm install --frozen-lockfile; pnpm run build
 ```
+
+## **Progress Updates**
+
+### **2025-01-31 - Critical Bug Fix: Corrupted Topic Mapping**
+
+**Issue Identified:**
+- System scanning with corrupted topics like "erge", "gre", "ewgerg", "ergerg" instead of real topics
+- Corrupted keywords: "google", "tewgw", "gerg", "new schedule" appearing in database
+- Data regenerating after cleanup, indicating source-level corruption
+
+**Root Cause Analysis:**
+- Corrupted data stored in `brand_tracking.keywords` array
+- System regenerating `keyword_tracking` entries from corrupted brand tracking data
+- Cleanup only removing surface-level data, not addressing source corruption
+
+**Solutions Implemented:**
+1. **Enhanced Cleanup API** (`/api/cleanup-corrupted-data`)
+   - Comprehensive cleanup action addressing both keyword and brand tracking tables
+   - Corrupted data detection and removal
+   - Clean default keyword creation
+
+2. **Topic Validation in Scan API**
+   - Corrupted topic detection (length < 3, contains 'erg', etc.)
+   - Fallback topic generation for invalid topics
+   - Prevention of corrupted topic usage in AI scanning
+
+3. **Cleanup Dashboard Component**
+   - User-friendly cleanup tools integrated into dashboard
+   - Multiple cleanup options (corrupted only, comprehensive, reset)
+   - Real-time database state inspection
+
+**Files Created/Modified:**
+- `app/api/cleanup-corrupted-data/route.ts` - Comprehensive cleanup API
+- `app/api/mentions/scan/route.ts` - Topic validation and fallback generation
+- `components/cleanup-corrupted-data.tsx` - Cleanup UI component
+- `app/dashboard/page.tsx` - Integration of cleanup tools
+
+**Next Steps:**
+- Deploy cleanup API to Render production
+- Run comprehensive cleanup to address root cause
+- Test scanning with clean topics
+- Verify URL extraction working properly
+
+**Impact:**
+- Prevents corrupted topics from being used in AI scanning
+- Addresses data regeneration at source level
+- Provides ongoing database maintenance tools
+- Improves system reliability and data quality
+
+---

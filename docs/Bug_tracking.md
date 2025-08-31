@@ -344,6 +344,55 @@
 
 ---
 
+### Issue #013: Corrupted Topic Mapping and Data Regeneration
+**Date:** 2025-01-31  
+**Severity:** Critical  
+**Status:** 🔴 OPEN
+
+**Description:**
+- System scanning with corrupted topics like "erge", "gre", "ewgerg", "ergerg" instead of real topics like "how to do seo"
+- Corrupted keywords: "google", "tewgw", "gerg", "new schedule" appearing in database
+- Data reappears after cleanup, suggesting regeneration from corrupted sources
+- AI scanning using wrong topics, resulting in irrelevant responses and no URL extraction
+
+**Root Cause:**
+- Corrupted data stored in `brand_tracking.keywords` array
+- System regenerating `keyword_tracking` entries from corrupted brand tracking data
+- Cleanup only removing surface-level corrupted data, not addressing source in brand tracking
+- Data flow: Brand Tracking → Keyword Tracking → AI Scanning (corrupted at source)
+
+**Resolution Implemented:**
+- ✅ **Enhanced Cleanup API** (`/api/cleanup-corrupted-data`) with comprehensive cleanup action
+- ✅ **Topic Validation** in scan API to detect and reject corrupted topics
+- ✅ **Fallback Topic Generation** when corrupted topics detected
+- ✅ **Comprehensive Cleanup** that addresses both keyword tracking and brand tracking tables
+- ✅ **Cleanup Component** added to dashboard for easy database maintenance
+
+**Files Modified:**
+- `app/api/cleanup-corrupted-data/route.ts` (created comprehensive cleanup API)
+- `app/api/mentions/scan/route.ts` (added topic validation and fallback generation)
+- `components/cleanup-corrupted-data.tsx` (created cleanup UI component)
+- `app/dashboard/page.tsx` (integrated cleanup component)
+
+**Cleanup Actions Available:**
+1. **Clean Corrupted**: Remove only corrupted keywords and related data
+2. **Comprehensive**: Clean corrupted data from both keyword tracking AND brand tracking
+3. **Reset to Default**: Complete reset with clean "how to do seo" keyword
+4. **List Keywords**: Inspect current database state
+
+**Next Steps:**
+- Deploy cleanup API to Render production
+- Run comprehensive cleanup to address root cause
+- Test scanning with clean topics
+- Verify URL extraction working properly
+
+**Prevention:**
+- Topic validation prevents corrupted topics from being used in AI scanning
+- Comprehensive cleanup addresses data regeneration sources
+- Regular database inspection and cleanup procedures
+
+---
+
 ## **🟡 MONITORING (No Current Issues)**
 
 ### Areas Under Observation:
