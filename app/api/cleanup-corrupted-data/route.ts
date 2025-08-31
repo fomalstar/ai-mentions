@@ -216,6 +216,144 @@ export async function POST(request: NextRequest) {
         })
       }
       
+    } else if (action === 'comprehensive-cleanup') {
+      // Comprehensive cleanup - check all possible sources of corrupted data
+      console.log('🧹 Starting comprehensive cleanup...')
+      
+      let totalDeleted = 0
+      const cleanupResults = []
+      
+      // 1. Clean corrupted keywords
+      const corruptedKeywords = await prisma.keywordTracking.findMany({
+        where: {
+          userId: dbUser.id,
+          OR: [
+            { keyword: { contains: 'erg' } },
+            { topic: { contains: 'erg' } },
+            { keyword: { contains: 'tewgw' } },
+            { keyword: { contains: 'gerg' } },
+            { keyword: { contains: 'google' } },
+            { keyword: { contains: 'new schedule' } },
+            { topic: { contains: 'erge' } },
+            { topic: { contains: 'gre' } },
+            { topic: { contains: 'ewgerg' } },
+            { topic: { contains: 'ergerg' } }
+          ]
+        }
+      })
+      
+      if (corruptedKeywords.length > 0) {
+        const deleteResult = await prisma.keywordTracking.deleteMany({
+          where: {
+            userId: dbUser.id,
+            OR: [
+              { keyword: { contains: 'erg' } },
+              { topic: { contains: 'erg' } },
+              { keyword: { contains: 'tewgw' } },
+              { keyword: { contains: 'gerg' } },
+              { keyword: { contains: 'google' } },
+              { keyword: { contains: 'new schedule' } },
+              { topic: { contains: 'erge' } },
+              { topic: { contains: 'gre' } },
+              { topic: { contains: 'ewgerg' } },
+              { topic: { contains: 'ergerg' } }
+            ]
+          }
+        })
+        
+        totalDeleted += deleteResult.count
+        cleanupResults.push(`Deleted ${deleteResult.count} corrupted keywords`)
+        
+        // Clean related data
+        await prisma.scanResult.deleteMany({
+          where: {
+            userId: dbUser.id,
+            keywordTrackingId: {
+              in: corruptedKeywords.map(k => k.id)
+            }
+          }
+        })
+        
+        await prisma.scanQueue.deleteMany({
+          where: {
+            userId: dbUser.id,
+            keywordTrackingId: {
+              in: corruptedKeywords.map(k => k.id)
+            }
+          }
+        })
+      }
+      
+      // 2. Check brand tracking for corrupted data
+      const brandTracking = await prisma.brandTracking.findMany({
+        where: { userId: dbUser.id }
+      })
+      
+      for (const brand of brandTracking) {
+        if (brand.keywords && Array.isArray(brand.keywords)) {
+          const hasCorruptedKeywords = brand.keywords.some((k: string) => 
+            k.includes('erg') || k.includes('tewgw') || k.includes('gerg') || 
+            k.includes('google') || k.includes('new schedule')
+          )
+          
+          if (hasCorruptedKeywords) {
+            console.log(`⚠️ Found corrupted keywords in brand tracking: ${brand.displayName}`)
+            
+            // Clean the keywords array
+            const cleanKeywords = brand.keywords.filter((k: string) => 
+              !k.includes('erg') && !k.includes('tewgw') && !k.includes('gerg') && 
+              !k.includes('google') && !k.includes('new schedule')
+            )
+            
+            if (cleanKeywords.length === 0) {
+              cleanKeywords.push('how to do seo') // Add default clean keyword
+            }
+            
+            await prisma.brandTracking.update({
+              where: { id: brand.id },
+              data: { keywords: cleanKeywords }
+            })
+            
+            cleanupResults.push(`Cleaned corrupted keywords in brand: ${brand.displayName}`)
+          }
+        }
+      }
+      
+      // 3. Create clean keyword if none exist
+      const remainingKeywords = await prisma.keywordTracking.count({
+        where: { userId: dbUser.id }
+      })
+      
+      if (remainingKeywords === 0) {
+        const brandTracking = await prisma.brandTracking.findFirst({
+          where: { userId: dbUser.id }
+        })
+        
+        if (brandTracking) {
+          const newKeyword = await prisma.keywordTracking.create({
+            data: {
+              userId: dbUser.id,
+              brandTrackingId: brandTracking.id,
+              keyword: 'how to do seo',
+              topic: 'how to do seo',
+              isActive: true
+            }
+          })
+          
+          cleanupResults.push(`Created clean default keyword: ${newKeyword.keyword}`)
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Comprehensive cleanup completed',
+        deleted: totalDeleted,
+        cleanupResults,
+        remainingKeywords: await prisma.keywordTracking.count({
+          where: { userId: dbUser.id }
+        })
+      })
+      
     } else {
       return NextResponse.json({ 
         error: 'Invalid action. Use: cleanup-corrupted-keywords, list-keywords, or reset-to-default' 

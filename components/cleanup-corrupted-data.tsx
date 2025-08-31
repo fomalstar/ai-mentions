@@ -133,6 +133,16 @@ export function CleanupCorruptedData() {
           </Button>
           
           <Button
+            onClick={comprehensiveCleanup}
+            disabled={isLoading}
+            variant="outline"
+            className="border-purple-300 text-purple-700 hover:bg-purple-100"
+          >
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            Comprehensive
+          </Button>
+          
+          <Button
             onClick={resetToDefault}
             disabled={isLoading}
             variant="outline"
