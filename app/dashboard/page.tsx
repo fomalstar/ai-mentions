@@ -631,7 +631,7 @@ export default function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              brandTrackingId: projectId, 
+              brandTrackingId: project.id, // Use the actual database brand tracking ID
               immediate: true 
             })
           })
