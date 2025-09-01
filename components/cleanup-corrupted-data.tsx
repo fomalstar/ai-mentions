@@ -98,6 +98,35 @@ export function CleanupCorruptedData() {
     }
   }
 
+  const comprehensiveCleanup = async () => {
+    if (!confirm('Are you sure you want to perform comprehensive cleanup? This will:\n- Remove corrupted keywords from keyword_tracking\n- Remove corrupted keywords from brand_tracking\n- Clean up related scan results\n- Clean up scan queue items\n\nThis action cannot be undone.')) {
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/cleanup-corrupted-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'comprehensive-cleanup' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(`Comprehensive cleanup completed! Deleted ${result.deleted.keywords} keywords and ${result.deleted.brandTracking} brand tracking items`)
+        console.log('🧹 Comprehensive cleanup result:', result)
+      } else {
+        const error = await response.json()
+        toast.error(`Comprehensive cleanup failed: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Comprehensive cleanup error:', error)
+      toast.error('Comprehensive cleanup failed - check console for details')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <Card className="border-orange-200 bg-orange-50">
       <CardHeader>

@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:setup": "node scripts/setup-db.js",
     "db:deploy": "node scripts/migrate.js",
+    "db:cleanup": "node scripts/cleanup-database.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

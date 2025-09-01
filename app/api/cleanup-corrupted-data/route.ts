@@ -289,33 +289,44 @@ export async function POST(request: NextRequest) {
         where: { userId: dbUser.id }
       })
       
+      let brandTrackingCleaned = 0
       for (const brand of brandTracking) {
+        let needsUpdate = false
+        let cleanKeywords = brand.keywords || []
+        
+        // Check keywords array for corruption
         if (brand.keywords && Array.isArray(brand.keywords)) {
           const hasCorruptedKeywords = brand.keywords.some((k: string) => 
             k.includes('erg') || k.includes('tewgw') || k.includes('gerg') || 
-            k.includes('google') || k.includes('new schedule')
+            k.includes('google') || k.includes('new schedule') || k === 'ergerg'
           )
           
           if (hasCorruptedKeywords) {
             console.log(`⚠️ Found corrupted keywords in brand tracking: ${brand.displayName}`)
             
             // Clean the keywords array
-            const cleanKeywords = brand.keywords.filter((k: string) => 
+            cleanKeywords = brand.keywords.filter((k: string) => 
               !k.includes('erg') && !k.includes('tewgw') && !k.includes('gerg') && 
-              !k.includes('google') && !k.includes('new schedule')
+              !k.includes('google') && !k.includes('new schedule') && k !== 'ergerg'
             )
             
-            if (cleanKeywords.length === 0) {
-              cleanKeywords.push('how to do seo') // Add default clean keyword
-            }
-            
-            await prisma.brandTracking.update({
-              where: { id: brand.id },
-              data: { keywords: cleanKeywords }
-            })
-            
-            cleanupResults.push(`Cleaned corrupted keywords in brand: ${brand.displayName}`)
+            needsUpdate = true
           }
+        }
+        
+        // Update keywords if needed
+        if (needsUpdate) {
+          if (cleanKeywords.length === 0) {
+            cleanKeywords.push('how to do seo') // Add default clean keyword
+          }
+          
+          await prisma.brandTracking.update({
+            where: { id: brand.id },
+            data: { keywords: cleanKeywords }
+          })
+          
+          cleanupResults.push(`Cleaned corrupted keywords in brand: ${brand.displayName}`)
+          brandTrackingCleaned++
         }
       }
       
@@ -347,7 +358,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Comprehensive cleanup completed',
-        deleted: totalDeleted,
+        deleted: {
+          keywords: totalDeleted,
+          brandTracking: brandTrackingCleaned
+        },
         cleanupResults,
         remainingKeywords: await prisma.keywordTracking.count({
           where: { userId: dbUser.id }
