@@ -118,6 +118,44 @@
 
 ---
 
+### Issue #018: Missing scan_result Table Causing Status Route 500 Errors (RESOLVED)
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Status endpoint returning 500 errors: "The table `public.scan_result` does not exist in the current database"
+- Projects being saved successfully but not loading due to status route failure
+- Projects appearing to "disappear" on refresh because status endpoint can't load them
+- Brand tracking query failing when trying to count scan results
+
+**Root Cause:**
+- When `scan_result` and `scan_queue` tables were dropped to fix column naming issues, they weren't recreated
+- Status route was trying to query `_count.scanResults` relationship which requires the `scan_result` table
+- No graceful fallback when scan tables don't exist yet
+
+**Resolution:**
+- ✅ **Added error handling** - Wrapped brand tracking query in try-catch block
+- ✅ **Graceful fallback** - If scan_result table doesn't exist, query brands without scan count
+- ✅ **Default values** - Add empty scan count (0) when table missing
+- ✅ **Maintained functionality** - Status endpoint works whether scan tables exist or not
+
+**Files Modified:**
+- `app/api/mentions/status/route.ts` - Added try-catch and fallback for missing scan_result table
+- `docs/Bug_tracking.md` - Documented solution
+
+**Prevention:**
+- Always handle missing table scenarios in database queries
+- Provide graceful fallbacks for optional data relationships
+- Test endpoints after dropping and recreating tables
+
+**Impact:**
+- ✅ **Projects now persist** - Status endpoint loads successfully even without scan tables
+- ✅ **No more 500 errors** - Graceful handling of missing scan_result table
+- ✅ **Progressive enhancement** - App works without scan functionality, gains features as tables are created
+
+---
+
 ### Issue #017: Prisma Field Name Mismatch in Status Route (RESOLVED)
 **Date:** 2025-01-31  
 **Severity:** High  
