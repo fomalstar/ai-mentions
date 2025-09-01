@@ -1372,10 +1372,13 @@ export default function Dashboard() {
       })
 
       if (response.ok) {
+        const result = await response.json()
+        const databaseProjectId = result.tracking.id // Use the database ID returned from API
+        
         // Also save to localStorage for local state
         const trackingItem = {
           id: Date.now().toString(),
-          projectId: data.projectId,
+          projectId: databaseProjectId, // Use database ID instead of UI projectId
           projectName: data.projectName,
           brandName: data.brandName,
           keyword: data.keyword,
@@ -1389,10 +1392,10 @@ export default function Dashboard() {
         const updatedTracking = [...existingTracking, trackingItem]
         localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
         
-        // Update project stats
+        // Update project stats  
         setProjects(prev => prev.map(p => 
-          p.id === data.projectId 
-            ? { ...p, keywordsTracked: p.keywordsTracked + 1 }
+          p.id === data.projectId || p.id === databaseProjectId
+            ? { ...p, id: databaseProjectId, keywordsTracked: p.keywordsTracked + 1 }
             : p
         ))
         
