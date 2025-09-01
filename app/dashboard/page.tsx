@@ -140,22 +140,50 @@ export default function Dashboard() {
 
   const fetchDataSources = async () => {
     try {
-      // For now, create simulated data sources from mention results
-      const simulatedSources = mentionResults
-        .filter(result => result.hasMention)
-        .map((result, index) => ({
-          id: `source-${index}`,
-          url: `https://example.com/ai-response-${index}`,
-          domain: 'example.com',
-          title: `AI Response from ${result.source}`,
-          date: result.detectedAt,
-          keyword: result.keyword,
-          platform: result.source
-        }))
+      console.log('🔍 Fetching data sources from API...')
       
-      setDataSources(simulatedSources)
+      const response = await fetch('/api/mentions/sources', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.sources) {
+        console.log(`✅ Loaded ${data.sources.length} data sources`)
+        
+        // Transform the sources data for the dashboard
+        const transformedSources = data.sources.flatMap((source: any) => 
+          source.urls.map((url: any, index: number) => ({
+            id: `${source.id}-${index}`,
+            url: url.url,
+            domain: url.domain,
+            title: url.title || `${source.platform} source for ${source.keyword}`,
+            date: source.scanDate,
+            brand: source.brandName,
+            keyword: source.keyword,
+            topic: source.topic,
+            platform: source.platform,
+            position: source.position,
+            confidence: source.confidence
+          }))
+        )
+        
+        setDataSources(transformedSources)
+        console.log(`📊 Transformed ${transformedSources.length} source URLs for display`)
+      } else {
+        console.log('📭 No data sources available yet')
+        setDataSources([])
+      }
     } catch (error) {
-      console.error('Error fetching data sources:', error)
+      console.error('❌ Error fetching data sources:', error)
+      // Set empty array on error instead of keeping old data
       setDataSources([])
     }
   }

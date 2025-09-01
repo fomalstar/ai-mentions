@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
           // Validate and clean the topic
           let scanTopic = keyword.topic
           
-          // Check if topic is valid (not corrupted or too short)
-          if (!scanTopic || scanTopic.trim().length < 3 || scanTopic.includes('erg') || scanTopic.length < 5) {
+          // Check if topic is corrupted (but NOT if it's a valid user topic)
+          if (!scanTopic || scanTopic.trim() === '' || ['ergerg', 'tewgw', 'gerg'].includes(scanTopic.toLowerCase().trim())) {
             console.warn(`⚠️ Invalid/corrupted topic detected: "${scanTopic}" for keyword: "${keyword.keyword}"`)
             
             // Try to construct a meaningful topic from the keyword
