@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
             { topic: { contains: 'erge' } },
             { topic: { contains: 'gre' } },
             { topic: { contains: 'ewgerg' } },
-            { topic: { contains: 'ergerg' } }
+            { topic: { contains: 'ergerg' } },
+            { topic: { in: ['sdgd', 'ewg', 'gsgsg'] } },
+            { keyword: { in: ['sdgd', 'ewg', 'gsgsg'] } }
           ]
         },
         select: {
@@ -261,7 +263,9 @@ export async function POST(request: NextRequest) {
             { topic: { contains: 'erge' } },
             { topic: { contains: 'gre' } },
             { topic: { contains: 'ewgerg' } },
-            { topic: { contains: 'ergerg' } }
+            { topic: { contains: 'ergerg' } },
+            { topic: { in: ['sdgd', 'ewg', 'gsgsg'] } },
+            { keyword: { in: ['sdgd', 'ewg', 'gsgsg'] } }
           ]
         }
       })
@@ -280,7 +284,9 @@ export async function POST(request: NextRequest) {
               { topic: { contains: 'erge' } },
               { topic: { contains: 'gre' } },
               { topic: { contains: 'ewgerg' } },
-              { topic: { contains: 'ergerg' } }
+              { topic: { contains: 'ergerg' } },
+              { topic: { in: ['sdgd', 'ewg', 'gsgsg'] } },
+              { keyword: { in: ['sdgd', 'ewg', 'gsgsg'] } }
             ]
           }
         })
@@ -322,7 +328,8 @@ export async function POST(request: NextRequest) {
         if (brand.keywords && Array.isArray(brand.keywords)) {
           const hasCorruptedKeywords = brand.keywords.some((k: string) => 
             k.includes('erg') || k.includes('tewgw') || k.includes('gerg') || 
-            k.includes('google') || k.includes('new schedule') || k === 'ergerg'
+            k.includes('google') || k.includes('new schedule') || k === 'ergerg' ||
+            ['sdgd', 'ewg', 'gsgsg'].includes(k)
           )
           
           if (hasCorruptedKeywords) {
@@ -331,7 +338,8 @@ export async function POST(request: NextRequest) {
             // Clean the keywords array
             cleanKeywords = brand.keywords.filter((k: string) => 
               !k.includes('erg') && !k.includes('tewgw') && !k.includes('gerg') && 
-              !k.includes('google') && !k.includes('new schedule') && k !== 'ergerg'
+              !k.includes('google') && !k.includes('new schedule') && k !== 'ergerg' &&
+              !['sdgd', 'ewg', 'gsgsg'].includes(k)
             )
             
             needsUpdate = true
