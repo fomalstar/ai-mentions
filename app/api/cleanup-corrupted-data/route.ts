@@ -449,9 +449,35 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('❌ Cleanup route error:', error)
+    
+    // Enhanced error logging for diagnosis
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+      
+      // Check for specific database errors
+      if (error.message.includes('foreign key constraint')) {
+        return NextResponse.json({ 
+          error: 'Database constraint error - manual cleanup required',
+          details: error.message,
+          solution: 'Use database admin tool to manually delete corrupted records'
+        }, { status: 500 })
+      }
+      
+      if (error.message.includes('connection')) {
+        return NextResponse.json({ 
+          error: 'Database connection failed',
+          details: error.message,
+          solution: 'Check database connection and try again'
+        }, { status: 500 })
+      }
+    }
+    
     return NextResponse.json({ 
       error: 'Cleanup failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+      action: 'Check server logs for detailed error information'
     }, { status: 500 })
   }
 }

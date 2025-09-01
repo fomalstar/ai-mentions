@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 export default function CleanupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<any>(null)
+  const [diagnostics, setDiagnostics] = useState<any>(null)
+  const [manualQueries, setManualQueries] = useState<any>(null)
 
   const runCleanup = async (action: string) => {
     setIsLoading(true)
@@ -46,6 +48,55 @@ export default function CleanupPage() {
     }
   }
 
+  const runDiagnostics = async () => {
+    setIsLoading(true)
+    setDiagnostics(null)
+    
+    try {
+      const response = await fetch('/api/db-diagnostics')
+      if (response.ok) {
+        const result = await response.json()
+        setDiagnostics(result.diagnostics)
+        toast.success('Database diagnostics completed')
+      } else {
+        const error = await response.json()
+        toast.error(`Diagnostics failed: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Diagnostics error:', error)
+      toast.error('Diagnostics failed - check console')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getManualQueries = async () => {
+    setIsLoading(true)
+    setManualQueries(null)
+    
+    try {
+      const response = await fetch('/api/db-diagnostics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'manual-queries' })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        setManualQueries(result)
+        toast.success('Manual cleanup queries generated')
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to generate queries: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Manual queries error:', error)
+      toast.error('Failed to generate queries - check console')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
@@ -55,6 +106,69 @@ export default function CleanupPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <AlertTriangle className="w-5 h-5" />
+                🔍 Database Diagnostics
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Check database connection and see what's causing cleanup failures
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={runDiagnostics}
+                disabled={isLoading}
+                variant="outline"
+                className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Run Diagnostics
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-800">
+                <List className="w-5 h-5" />
+                📋 Manual Database Cleanup
+              </CardTitle>
+              <CardDescription className="text-purple-700">
+                Get SQL queries to run manually in database admin tool
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={getManualQueries}
+                disabled={isLoading}
+                variant="outline"
+                className="w-full border-purple-300 text-purple-700 hover:bg-purple-100"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <List className="w-4 h-4 mr-2" />
+                    Get Manual Queries
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
           <Card className="border-orange-200 bg-orange-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-orange-800">
@@ -220,12 +334,61 @@ export default function CleanupPage() {
           </Card>
         </div>
 
+        {diagnostics && (
+          <Card className="border-blue-200 bg-blue-50 mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <CheckCircle className="w-5 h-5" />
+                Database Diagnostics Results
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="bg-white p-4 rounded-lg border text-sm overflow-auto max-h-96">
+                {JSON.stringify(diagnostics, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+
+        {manualQueries && (
+          <Card className="border-purple-200 bg-purple-50 mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-800">
+                <List className="w-5 h-5" />
+                Manual Database Cleanup Queries
+              </CardTitle>
+              <CardDescription>
+                Copy these SQL queries and run them in your database admin tool (like psql or pgAdmin)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-white p-4 rounded-lg border">
+                <p className="text-sm font-medium mb-2">{manualQueries.instructions}</p>
+                <pre className="text-sm overflow-auto max-h-96 bg-gray-100 p-3 rounded">
+                  {manualQueries.queries?.join('\n')}
+                </pre>
+                <Button
+                  onClick={() => {
+                    navigator.clipboard.writeText(manualQueries.queries?.join('\n') || '')
+                    toast.success('Queries copied to clipboard!')
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                >
+                  📋 Copy to Clipboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {results && (
           <Card className="border-green-200 bg-green-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-800">
                 <CheckCircle className="w-5 h-5" />
-                Results
+                Cleanup Results
               </CardTitle>
             </CardHeader>
             <CardContent>

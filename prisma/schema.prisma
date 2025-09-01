@@ -270,7 +270,7 @@ model ScanResult {
   @@index([userId, brandTrackingId])
   @@index([keywordTrackingId, platform])
   @@index([createdAt])
-  @@map("scan_results")
+  @@map("scan_result")
 }
 
 model ScanQueue {

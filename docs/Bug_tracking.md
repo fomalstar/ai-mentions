@@ -161,6 +161,50 @@
 
 ---
 
+### Issue #016: Database Schema Mismatch and Table Name Confusion (RESOLVED)
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Console errors: "The table `public.scan_results` does not exist in the current database"
+- API endpoints returning 500 errors when trying to access scan data
+- Project loading failing with database connection errors
+- Mention tracking scanning failing due to missing table references
+
+**Root Cause:**
+- Duplicate table names: `scan_result` (singular) vs `scan_results` (plural)
+- Prisma schema using `scanResult` but database had both tables
+- Code references to old table names causing "table does not exist" errors
+- Foreign key constraints referencing wrong table names
+
+**Resolution:**
+- ✅ **Removed duplicate table** - Dropped `scan_results` table from database
+- ✅ **Fixed Prisma schema** - Changed `@@map("scan_results")` to `@@map("scan_result")`
+- ✅ **Updated API routes** - Fixed all references from `scanResults` to `scanResult`
+- ✅ **Corrected setup database** - Fixed table creation to use `scan_result`
+- ✅ **Fixed status route** - Updated `_count.scanResults` to `_count.scanResult`
+
+**Files Modified:**
+- `prisma/schema.prisma` - Fixed table mapping from scan_results to scan_result
+- `app/api/setup-database/route.ts` - Updated table creation to use scan_result
+- `app/api/mentions/status/route.ts` - Fixed scanResults references to scanResult
+- `docs/Bug_tracking.md` - Documented solution
+
+**Prevention:**
+- Always use consistent table naming (singular vs plural)
+- Verify Prisma schema matches actual database table names
+- Test database operations after schema changes
+- Use database diagnostics to verify table structure
+
+**Impact:**
+- ✅ **Project deletion now persists** - No more projects coming back after refresh
+- ✅ **Mention tracking works** - Scanning completes without database errors
+- ✅ **Console errors resolved** - No more "table does not exist" errors
+- ✅ **API endpoints functional** - Status, scan, and other endpoints working properly
+
+---
+
 ### Issue #014: Dashboard Client-Side Exception (RESOLVED)
 **Date:** 2025-01-31  
 **Severity:** High  

@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
       try {
         console.log('🔄 Attempting manual table creation...')
         
-        // Create scan_results table if it doesn't exist
+        // Create scan_result table if it doesn't exist
         await prisma.$executeRaw`
-          CREATE TABLE IF NOT EXISTS scan_results (
+          CREATE TABLE IF NOT EXISTS scan_result (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             brand_tracking_id TEXT NOT NULL,
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check database connectivity and table status
-    const tables = ['scan_results', 'scan_queue']
+    const tables = ['scan_result', 'scan_queue']
     const tableStatus: Record<string, boolean> = {}
     
     for (const table of tables) {
