@@ -390,7 +390,8 @@ export async function GET() {
     availableActions: [
       'cleanup-corrupted-keywords',
       'list-keywords', 
-      'reset-to-default'
+      'reset-to-default',
+      'comprehensive-cleanup'
     ],
     description: 'POST with action to clean up corrupted data'
   })

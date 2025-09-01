@@ -123,10 +123,7 @@ export async function POST(request: NextRequest) {
           
           console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${scanTopic}`)
           
-          // Check if required environment variables are set
-          if (!process.env.PERPLEXITY_API_KEY || !process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY) {
-            throw new Error('Missing required API keys for AI scanning')
-          }
+          // Proceed with available API keys; platforms without keys will return error result
           
           const scanResults = await aiScanningService.scanKeyword({
             userId: dbUser.id,  // Use database user ID
@@ -144,6 +141,20 @@ export async function POST(request: NextRequest) {
             keyword: keyword.keyword,
             results: scanResults
           })
+
+          // Persist results
+          try {
+            await aiScanningService.storeScanResults({
+              userId: dbUser.id,
+              brandTrackingId: brandTracking.id,
+              keywordTrackingId: keyword.id,
+              brandName: brandTracking.displayName,
+              keyword: keyword.keyword,
+              topic: scanTopic
+            }, scanResults)
+          } catch (storeErr) {
+            console.warn('Failed to persist scan results:', storeErr instanceof Error ? storeErr.message : storeErr)
+          }
         } catch (error) {
           console.error(`❌ Scan error for keyword ${keyword.keyword}:`, error)
           
@@ -241,11 +252,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Align with POST: resolve database user ID via email
+    let dbUser
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, email: true }
+      })
+      if (!dbUser) {
+        return NextResponse.json({ error: 'User not found in database' }, { status: 404 })
+      }
+    } catch (userErr) {
+      return NextResponse.json({ error: 'Failed to find user in database' }, { status: 500 })
+    }
+
     const { searchParams } = new URL(request.url)
     const brandTrackingId = searchParams.get('brandTrackingId')
 
     // Get recent scan results
-    const where: any = { userId: session.user.id }
+    const where: any = { userId: dbUser.id }
     if (brandTrackingId) {
       where.brandTrackingId = brandTrackingId
     }
@@ -267,7 +292,7 @@ export async function GET(request: NextRequest) {
     // Get scan queue status
     const queueStatus = await prisma.scanQueue.findMany({
       where: {
-        userId: session.user.id,
+        userId: dbUser.id,
         status: { in: ['pending', 'running'] }
       },
       orderBy: { scheduledAt: 'asc' },
