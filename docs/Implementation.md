@@ -383,4 +383,177 @@ const response = await fetch('/api/create', { ... })
 
 ---
 
+## **🔍 AI Scanning System Architecture (January 2025)**
+
+### **How the Scanning System Works**
+
+**Scan Flow Overview:**
+```
+User clicks "Scan" → /api/mentions/scan → AI Scanning Service → 3 Platforms (Parallel) → Store Results
+```
+
+**1. Scan API Endpoint (`/api/mentions/scan`)**
+```typescript
+// app/api/mentions/scan/route.ts
+// The system scans ALL keywords in a brand tracking record
+for (const keyword of brandTracking.keywordTracking) {
+  // Each keyword gets scanned regardless of user intent
+  const scanResults = await aiScanningService.scanKeyword({...})
+}
+```
+
+**2. AI Scanning Service (`lib/ai-scanning.ts`)**
+```typescript
+// Always scans across 3 platforms in parallel
+const platforms = [
+  { name: 'perplexity', method: this.scanPerplexity.bind(this) },
+  { name: 'chatgpt', method: this.scanChatGPT.bind(this) },
+  { name: 'gemini', method: this.scanGemini.bind(this) }
+]
+
+// Parallel execution for speed
+const scanPromises = platforms.map(async (platform) => {
+  return await platform.method(request)
+})
+const results = await Promise.all(scanPromises)
+```
+
+**3. Topic Validation and Fallbacks**
+```typescript
+// app/api/mentions/scan/route.ts lines 108-125
+const isCorrupted = !scanTopic || 
+                  cleanTopic === '' || 
+                  ['ergerg', 'tewgw', 'gerg', 'sdgd', 'ewg', 'gsgsg'].includes(cleanTopic) ||
+                  (cleanTopic.length < 5 && !/^(ai|seo|web|app|api)$/i.test(cleanTopic))
+
+if (isCorrupted) {
+  // Generates fallback topic instead of skipping
+  scanTopic = `What are the best alternatives to ${brandName}? List search engines and similar tools.`
+}
+```
+
+### **Current Scanning Behavior**
+
+**What Happens When User Scans:**
+1. **Multiple Keywords**: ALL keywords in the brand tracking record get scanned
+2. **Corrupted Topics**: Empty/corrupted topics trigger fallback generation
+3. **3-Platform Coverage**: Each keyword scanned across Perplexity + ChatGPT + Gemini
+4. **Parallel Execution**: All platforms run simultaneously for speed
+
+**Example from Logs:**
+```
+User wants: Scan "yandex" with topic "give me a list of search engines"
+System does: 
+  ✅ Scan "yandex" with "give me a list of search engines" (3 platforms)
+  ⚠️ Scan "new schedule" with fallback topic (3 platforms) ← Unwanted!
+```
+
+### **Configuration and Control**
+
+**Environment Variables Required:**
+```bash
+# Required for AI scanning to work
+PERPLEXITY_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here  
+GOOGLE_API_KEY=your_key_here
+```
+
+**Database Tables Involved:**
+- `brandTracking` - Contains brand information and keywords
+- `keywordTracking` - Contains individual keywords and topics
+- `scanResult` - Stores scan results and extracted URLs
+- `scanQueue` - For scheduled/queued scans
+
+**API Parameters:**
+```typescript
+POST /api/mentions/scan
+{
+  brandTrackingId: string,      // Required: Which brand to scan
+  keywordTrackingId?: string,   // Optional: Limit to specific keyword
+  immediate: boolean            // true = scan now, false = queue
+}
+```
+
+### **Common Issues and Solutions**
+
+**Issue 1: Multiple Keywords Being Scanned**
+```typescript
+// PROBLEM: Always scans all keywords
+for (const keyword of brandTracking.keywordTracking) {
+  // This scans EVERYTHING
+}
+
+// SOLUTION: Use keywordTrackingId to filter
+const keywords = keywordTrackingId 
+  ? brandTracking.keywordTracking.filter(k => k.id === keywordTrackingId)
+  : brandTracking.keywordTracking
+```
+
+**Issue 2: Corrupted Topics Triggering Fallbacks**
+```typescript
+// PROBLEM: Generates fallback for empty topics
+if (isCorrupted) {
+  scanTopic = `What are the best alternatives to ${brandName}? List search engines and similar tools.`
+}
+
+// SOLUTION: Skip corrupted topics entirely
+if (isCorrupted) {
+  console.warn(`Skipping corrupted topic: "${scanTopic}"`)
+  continue // Skip this keyword
+}
+```
+
+**Issue 3: Always Scanning 3 Platforms**
+```typescript
+// PROBLEM: Hardcoded 3-platform scanning
+const platforms = ['perplexity', 'chatgpt', 'gemini']
+
+// SOLUTION: Make platform selection configurable
+const enabledPlatforms = getEnabledPlatforms(userId) // From user preferences
+```
+
+### **Performance Characteristics**
+
+**Scan Duration:**
+- **Sequential**: ~56 seconds (18s + 20s + 18s per platform)
+- **Parallel**: ~23 seconds (all platforms simultaneously)
+- **Speed improvement**: ~2.4x faster with parallel execution
+
+**API Rate Limits:**
+- **Perplexity**: Check `process.env.PERPLEXITY_API_KEY`
+- **ChatGPT**: Check `process.env.OPENAI_API_KEY`
+- **Gemini**: Check `process.env.GOOGLE_API_KEY`
+
+**Cost Considerations:**
+- Each keyword × 3 platforms = 3 API calls per scan
+- Multiple keywords = multiple × 3 API calls
+- Consider implementing scan limits and user quotas
+
+### **Future Improvements Needed**
+
+**1. Selective Scanning**
+- Allow users to choose which keywords to scan
+- Implement keyword selection UI in dashboard
+
+**2. Platform Selection**  
+- Let users choose which AI platforms to use
+- Save platform preferences per user
+
+**3. Topic Management**
+- Better topic validation and cleaning
+- Skip corrupted topics instead of fallbacks
+- Topic editing interface
+
+**4. Scan Optimization**
+- Implement scan result caching
+- Add scan scheduling and batching
+- User-defined scan intervals
+
+**5. Data Quality**
+- Remove corrupted keyword entries
+- Implement topic validation rules
+- Regular database cleanup procedures
+
+---
+
 This implementation plan provides a comprehensive roadmap for completing the AI Mentions Platform, with clear stages, dependencies, and success metrics. The current progress shows strong foundation work completed, with the advanced AI features in active development.

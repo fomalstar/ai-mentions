@@ -959,5 +959,51 @@ projectId: databaseProjectId, // ✅ FIXED: now syncs with database
 
 ---
 
+## Issue #022: Multiple Keyword Scanning and Corrupted Topic Fallbacks
+**Status**: 🔍 INVESTIGATED  
+**Priority**: MEDIUM  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+After fixing the ID synchronization issue, scans are working but revealing new problems:
+1. **Multiple keywords scanned**: System scans ALL keywords in a brand tracking record instead of just the selected one
+2. **Corrupted topic fallbacks**: Empty topics `""` are being replaced with generic fallback topics like "What are the best alternatives to Yandex? List search engines and similar tools."
+3. **3-platform parallel scanning**: Each keyword is scanned across Perplexity, ChatGPT, and Gemini simultaneously
+
+**Evidence from Server Logs:**
+```
+⚠️ Invalid/corrupted topic detected: "" for keyword: "new schedule"
+🔧 Using brand-based fallback topic: "What are the best alternatives to Yandex? List search engines and similar tools."
+🔍 Starting AI scan for keyword: new schedule, topic: [FALLBACK TOPIC]
+🔍 Starting AI scan for keyword: yandex, topic: give me a list of search engines
+🚀 Starting PARALLEL scan for topic: "..." across 3 platforms
+```
+
+**Root Cause Analysis:**
+1. **Multiple keyword scanning**: `app/api/mentions/scan/route.ts` line 103 loops through ALL keywords in `brandTracking.keywordTracking`
+2. **Topic validation too aggressive**: Empty topics trigger fallback generation instead of being skipped
+3. **3-platform scanning**: `lib/ai-scanning.ts` line 42-44 scans across Perplexity, ChatGPT, and Gemini for every keyword
+
+**Current Behavior:**
+- User wants to scan "yandex" with topic "give me a list of search engines"
+- System also scans "new schedule" with corrupted topic (empty string)
+- Both keywords get scanned across 3 AI platforms
+- Results include unwanted fallback topic scans
+
+**Files Involved:**
+- `app/api/mentions/scan/route.ts` - Multiple keyword loop and topic validation
+- `lib/ai-scanning.ts` - 3-platform parallel scanning
+- Database: `keywordTracking` table contains corrupted entries
+
+**Recommendations for Future AI Agents:**
+1. **Check keyword filtering**: Verify if `keywordTrackingId` parameter is being used to limit scans
+2. **Review topic validation**: Consider skipping corrupted topics instead of generating fallbacks
+3. **Platform selection**: Allow users to choose which AI platforms to scan
+4. **Data cleanup**: Remove corrupted keyword entries from database
+
+**Status**: Investigation complete, requires business decision on scanning behavior
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*
