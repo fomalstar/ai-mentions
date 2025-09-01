@@ -1340,21 +1340,38 @@ export default function Dashboard() {
   }
 
   // Remove topic from tracking
-  const removeTopicFromTracking = (projectId: string, topic: any) => {
-    const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-    const updatedTracking = existingTracking.filter((item: any) => 
-      !(item.projectId === projectId && item.topic === topic.topic)
-    )
-    localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
-    
-    // Update project stats
-    setProjects(prev => prev.map(p => 
-      p.id === projectId 
-        ? { ...p, keywordsTracked: Math.max(0, p.keywordsTracked - 1) }
-        : p
-    ))
-    
-    toast.success('Topic removed from tracking')
+  const removeTopicFromTracking = async (projectId: string, topic: any) => {
+    try {
+      // Call the API to delete the keyword from database
+      const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${topic.keyword}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (response.ok) {
+        // Also update localStorage for local state
+        const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        const updatedTracking = existingTracking.filter((item: any) => 
+          !(item.projectId === projectId && item.topic === topic.topic)
+        )
+        localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+        
+        // Update project stats
+        setProjects(prev => prev.map(p => 
+          p.id === projectId 
+            ? { ...p, keywordsTracked: Math.max(0, p.keywordsTracked - 1) }
+            : p
+        ))
+        
+        toast.success('Topic removed from tracking and database')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to remove topic from database')
+      }
+    } catch (error) {
+      console.error('Remove topic error:', error)
+      toast.error('Failed to remove topic')
+    }
   }
 
   // Add manual keyword tracking

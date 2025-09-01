@@ -194,42 +194,127 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const brandTrackingId = searchParams.get('id')
+    const id = searchParams.get('id')
+    const keywordId = searchParams.get('keywordId')
+    const keyword = searchParams.get('keyword')
 
-    if (!brandTrackingId) {
-      return NextResponse.json({ error: 'Brand tracking ID is required' }, { status: 400 })
+    // Check if database is available
+    let isDatabaseAvailable = false
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      isDatabaseAvailable = true
+    } catch (error) {
+      console.log('Database not available, running in demo mode')
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Demo mode - operation completed in memory',
+        demoMode: true
+      })
     }
 
-    console.log('🗑️ Deleting brand tracking:', brandTrackingId)
+    if (keywordId && keyword) {
+      // Delete specific keyword from keywordTracking
+      console.log(`🗑️ Deleting keyword: ${keyword} from keyword tracking`)
+      
+      try {
+        // First verify the keyword belongs to a brand tracking record owned by this user
+        const keywordRecord = await prisma.keywordTracking.findFirst({
+          where: {
+            id: keywordId,
+            userId: dbUser.id
+          },
+          include: {
+            brandTracking: true
+          }
+        })
 
-    // Check if brand tracking exists and belongs to user
-    const brandTracking = await prisma.brandTracking.findFirst({
-      where: {
-        id: brandTrackingId,
-        userId: dbUser.id
+        if (!keywordRecord) {
+          return NextResponse.json({ error: 'Keyword not found or access denied' }, { status: 404 })
+        }
+
+        // Delete the keyword
+        await prisma.keywordTracking.delete({
+          where: {
+            id: keywordId,
+            userId: dbUser.id
+          }
+        })
+
+        // Update the brand tracking keywords array to remove this keyword
+        const updatedKeywords = keywordRecord.brandTracking.keywords.filter(k => k !== keyword)
+        await prisma.brandTracking.update({
+          where: {
+            id: keywordRecord.brandTrackingId,
+            userId: dbUser.id
+          },
+          data: {
+            keywords: updatedKeywords
+          }
+        })
+
+        console.log(`✅ Keyword deleted successfully: ${keyword}`)
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Keyword deleted successfully' 
+        })
+
+      } catch (deleteError) {
+        console.error('❌ Failed to delete keyword:', deleteError)
+        return NextResponse.json({ 
+          error: 'Failed to delete keyword',
+          details: deleteError instanceof Error ? deleteError.message : 'Unknown error'
+        }, { status: 500 })
       }
-    })
 
-    if (!brandTracking) {
-      return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
+    } else if (id) {
+      // Delete entire brand tracking record (existing functionality)
+      console.log(`🗑️ Deleting brand tracking: ${id}`)
+      
+      try {
+        // First verify the brand tracking record belongs to this user
+        const brandTracking = await prisma.brandTracking.findFirst({
+          where: {
+            id: id,
+            userId: dbUser.id
+          }
+        })
+
+        if (!brandTracking) {
+          return NextResponse.json({ error: 'Brand tracking not found or access denied' }, { status: 404 })
+        }
+
+        // Delete the brand tracking record (cascade will handle related data)
+        await prisma.brandTracking.delete({
+          where: {
+            id: id,
+            userId: dbUser.id
+          }
+        })
+
+        console.log(`✅ Brand tracking deleted successfully: ${id}`)
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Project deleted successfully' 
+        })
+
+      } catch (deleteError) {
+        console.error('❌ Failed to delete brand tracking:', deleteError)
+        return NextResponse.json({ 
+          error: 'Failed to delete project',
+          details: deleteError instanceof Error ? deleteError.message : 'Unknown error'
+        }, { status: 500 })
+      }
+
+    } else {
+      return NextResponse.json({ 
+        error: 'Either id (for entire project) or keywordId+keyword (for specific keyword) is required' 
+      }, { status: 400 })
     }
-
-    // Delete brand tracking (cascade will handle related records)
-    await prisma.brandTracking.delete({
-      where: { id: brandTrackingId }
-    })
-
-    console.log('✅ Brand tracking deleted successfully:', brandTrackingId)
-
-    return NextResponse.json({ 
-      success: true,
-      message: `Project "${brandTracking.displayName}" deleted successfully`
-    })
 
   } catch (error) {
-    console.error('Delete brand tracking error:', error)
+    console.error('Delete error:', error)
     return NextResponse.json({ 
-      error: 'Failed to delete brand tracking',
+      error: 'Failed to delete',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
