@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       }
       
     } else if (action === 'list-keywords') {
-      // List all current keywords for inspection
+      // List all current keywords AND brand tracking for full diagnosis
       const allKeywords = await prisma.keywordTracking.findMany({
         where: { userId: dbUser.id },
         select: {
@@ -156,10 +156,34 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: 'desc' }
       })
       
+      // CRITICAL: Also check brand tracking table for corruption
+      const brandTracking = await prisma.brandTracking.findMany({
+        where: { userId: dbUser.id },
+        select: {
+          id: true,
+          displayName: true,
+          keywords: true,
+          createdAt: true,
+          lastScanAt: true
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+      
       return NextResponse.json({
         success: true,
-        message: 'Current keywords listed',
-        keywords: allKeywords
+        message: 'Current database state listed',
+        keywords: allKeywords,
+        brandTracking: brandTracking,
+        summary: {
+          totalKeywords: allKeywords.length,
+          totalBrands: brandTracking.length,
+          corruptedKeywords: allKeywords.filter(k => 
+            k.keyword?.includes('erg') || k.topic?.includes('erg')
+          ).length,
+          corruptedBrands: brandTracking.filter(b => 
+            b.keywords?.some((k: string) => k.includes('erg'))
+          ).length
+        }
       })
       
     } else if (action === 'reset-to-default') {
@@ -368,9 +392,58 @@ export async function POST(request: NextRequest) {
         })
       })
       
+    } else if (action === 'nuclear-reset') {
+      // NUCLEAR RESET: Delete ALL data and start fresh
+      console.log('💥 Starting NUCLEAR RESET - deleting ALL user data...')
+      
+      // Delete in correct order to avoid foreign key issues
+      await prisma.scanResult.deleteMany({ where: { userId: dbUser.id } })
+      await prisma.scanQueue.deleteMany({ where: { userId: dbUser.id } })
+      await prisma.keywordTracking.deleteMany({ where: { userId: dbUser.id } })
+      await prisma.brandTracking.deleteMany({ where: { userId: dbUser.id } })
+      
+      console.log('✅ All user data deleted')
+      
+      // Create fresh brand tracking
+      const newBrand = await prisma.brandTracking.create({
+        data: {
+          userId: dbUser.id,
+          brandName: 'my-brand',
+          displayName: 'My Brand',
+          keywords: ['how to do seo'],
+          isActive: true
+        }
+      })
+      
+      // Create fresh keyword tracking
+      const newKeyword = await prisma.keywordTracking.create({
+        data: {
+          userId: dbUser.id,
+          brandTrackingId: newBrand.id,
+          keyword: 'how to do seo',
+          topic: 'how to do seo',
+          isActive: true
+        }
+      })
+      
+      return NextResponse.json({
+        success: true,
+        message: 'NUCLEAR RESET completed - all data deleted and recreated',
+        newBrand: {
+          id: newBrand.id,
+          displayName: newBrand.displayName,
+          keywords: newBrand.keywords
+        },
+        newKeyword: {
+          id: newKeyword.id,
+          keyword: newKeyword.keyword,
+          topic: newKeyword.topic
+        }
+      })
+      
     } else {
       return NextResponse.json({ 
-        error: 'Invalid action. Use: cleanup-corrupted-keywords, list-keywords, or reset-to-default' 
+        error: 'Invalid action. Use: cleanup-corrupted-keywords, list-keywords, reset-to-default, comprehensive-cleanup, or nuclear-reset' 
       }, { status: 400 })
     }
     
@@ -391,7 +464,8 @@ export async function GET() {
       'cleanup-corrupted-keywords',
       'list-keywords', 
       'reset-to-default',
-      'comprehensive-cleanup'
+      'comprehensive-cleanup',
+      'nuclear-reset'
     ],
     description: 'POST with action to clean up corrupted data'
   })

@@ -118,6 +118,49 @@
 
 ---
 
+### Issue #015: Persistent Project/Brand Corruption (SOLVED)
+**Date:** 2025-01-31  
+**Severity:** Critical  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Projects keep coming back after deletion despite attempts to remove them
+- "ergerg" and other corrupted keywords persist even after cleanup
+- Database cleanup tools weren't targeting the root cause
+- Brand tracking table was the source of regeneration
+
+**Root Cause:**
+- Corrupted data in `brand_tracking` table causing regeneration
+- Previous cleanup tools only targeted `keyword_tracking` table
+- Cascade deletion not working properly for all related data
+- Foreign key relationships allowing orphaned data to persist
+
+**Resolution:**
+- ✅ **Enhanced List Keywords** - Now shows both keywords AND brand tracking
+- ✅ **Comprehensive Cleanup** - Cleans both keyword_tracking AND brand_tracking tables
+- ✅ **Nuclear Reset Option** - Complete deletion and recreation of all user data
+- ✅ **Improved Diagnostics** - Shows corruption summary for both tables
+- ✅ **Proper Cascade Order** - Deletes in correct order to avoid FK violations
+
+**Files Modified:**
+- `app/api/cleanup-corrupted-data/route.ts` - Added nuclear-reset action and enhanced diagnostics
+- `app/cleanup/page.tsx` - Added Nuclear Reset button with confirmation
+- `docs/Bug_tracking.md` - Documented solution
+
+**Prevention:**
+- Monitor brand_tracking table for corruption during any data operations
+- Always check both keyword_tracking AND brand_tracking when debugging persistence issues
+- Use Nuclear Reset for complete clean slate if cascade deletion fails
+
+**Solution Steps for Users:**
+1. Deploy updated code to Render
+2. Visit `https://your-app.onrender.com/cleanup`
+3. Click "List Keywords" to see full database state including brand tracking
+4. Try "Comprehensive Cleanup" first to clean both tables
+5. If projects still persist, use "Nuclear Reset" to delete everything and start fresh
+
+---
+
 ### Issue #014: Dashboard Client-Side Exception (RESOLVED)
 **Date:** 2025-01-31  
 **Severity:** High  

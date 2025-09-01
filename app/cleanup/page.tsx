@@ -31,6 +31,8 @@ export default function CleanupPage() {
           toast.success(`Found ${result.keywords?.length || 0} keywords in database`)
         } else if (action === 'reset-to-default') {
           toast.success('Database reset to clean state!')
+        } else if (action === 'nuclear-reset') {
+          toast.success('Nuclear reset completed! All data deleted and recreated.')
         }
       } else {
         const error = await response.json()
@@ -175,6 +177,42 @@ export default function CleanupPage() {
                   <>
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Reset to Default
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-500 bg-red-100 md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-900">
+                <AlertTriangle className="w-5 h-5" />
+                💥 Nuclear Reset (DANGER)
+              </CardTitle>
+              <CardDescription className="text-red-800">
+                DELETE ALL DATA and start completely fresh. Use only if other cleanups fail.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => {
+                  if (confirm('⚠️ DANGER: This will DELETE ALL your data and start fresh. Are you absolutely sure?')) {
+                    runCleanup('nuclear-reset')
+                  }
+                }}
+                disabled={isLoading}
+                variant="destructive"
+                className="w-full"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting Everything...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    💥 Nuclear Reset
                   </>
                 )}
               </Button>
