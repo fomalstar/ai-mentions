@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: { 
-            scanResult: {
+            scanResults: {
               where: {
                 createdAt: {
                   gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
       totalKeywords: brands.reduce((sum, b) => sum + b.keywordTracking.length, 0),
       pendingScans: queueItems.filter(q => q.status === 'pending').length,
       runningScans: queueItems.filter(q => q.status === 'running').length,
-              scansLast24h: brands.reduce((sum, b) => sum + b._count.scanResult, 0),
+              scansLast24h: brands.reduce((sum, b) => sum + b._count.scanResults, 0),
       mentionsFound: recentResults.filter(r => r.brandMentioned).length,
       avgPosition: calculateAveragePosition(recentResults),
       platformBreakdown: calculatePlatformBreakdown(recentResults)
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
         lastScanAt: kw.lastScanAt,
         scanCount: kw.scanCount
       })),
-              scansLast24h: brand._count.scanResult
+              scansLast24h: brand._count.scanResults
     }))
 
     return NextResponse.json({

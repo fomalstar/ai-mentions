@@ -118,6 +118,45 @@
 
 ---
 
+### Issue #017: Prisma Field Name Mismatch in Status Route (RESOLVED)
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- API endpoints returning 500 errors: "Unknown field `scanResult` for select statement on model `BrandTrackingCountOutputType`"
+- Status route failing to load projects due to incorrect field reference
+- Project loading failing with database validation errors
+- Scan endpoint returning 404 errors
+
+**Root Cause:**
+- Prisma schema uses `scanResults` (plural) in `BrandTracking` model
+- Status route was incorrectly referencing `scanResult` (singular) in `_count` select
+- Field name mismatch causing Prisma validation errors
+- Build successful but runtime Prisma errors
+
+**Resolution:**
+- ✅ **Fixed field references** - Changed `_count.scanResult` to `_count.scanResults` in status route
+- ✅ **Corrected all instances** - Updated all three references in the status route
+- ✅ **Verified schema consistency** - Confirmed Prisma schema uses `scanResults` (plural)
+- ✅ **Rebuilt project** - Ensured all changes are properly compiled
+
+**Files Modified:**
+- `app/api/mentions/status/route.ts` - Fixed scanResult to scanResults in _count select
+- `docs/Bug_tracking.md` - Documented solution
+
+**Prevention:**
+- Always verify field names match exactly between Prisma schema and API routes
+- Use Prisma Studio or schema introspection to verify field names
+- Test database operations after schema changes
+
+**Impact:**
+- ✅ **Project loading now works** - Status endpoint returns data without 500 errors
+- ✅ **Scan endpoint accessible** - No more 404 errors on scan requests
+- ✅ **Database validation passed** - Prisma queries now execute successfully
+
+---
+
 ### Issue #015: Persistent Project/Brand Corruption (SOLVED)
 **Date:** 2025-01-31  
 **Severity:** Critical  
@@ -181,9 +220,9 @@
 **Resolution:**
 - ✅ **Removed duplicate table** - Dropped `scan_results` table from database
 - ✅ **Fixed Prisma schema** - Changed `@@map("scan_results")` to `@@map("scan_result")`
-- ✅ **Updated API routes** - Fixed all references from `scanResults` to `scanResult`
+- ✅ **Updated API routes** - Fixed all references from `scanResult` to `scanResults` in _count
 - ✅ **Corrected setup database** - Fixed table creation to use `scan_result`
-- ✅ **Fixed status route** - Updated `_count.scanResults` to `_count.scanResult`
+- ✅ **Fixed status route** - Updated `_count.scanResult` to `_count.scanResults` (correct plural form)
 
 **Files Modified:**
 - `prisma/schema.prisma` - Fixed table mapping from scan_results to scan_result
