@@ -1184,22 +1184,37 @@ export default function Dashboard() {
     router.push('/pricing')
   }
 
-  const deleteProject = (projectId: string) => {
-    // Remove project
-    const updatedProjects = projects.filter(project => project.id !== projectId)
-    setProjects(updatedProjects)
-    
-    // Remove associated tracking items
-    const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-    const updatedTracking = existingTracking.filter((item: any) => item.projectId !== projectId)
-    localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
-    
-    // Remove associated mentions
-    const updatedMentions = mentionResults.filter(mention => mention.projectId !== projectId)
-    setMentionResults(updatedMentions)
-    localStorage.setItem('mentionResults', JSON.stringify(updatedMentions))
-    
-    toast.success('Project deleted successfully')
+  const deleteProject = async (projectId: string) => {
+    try {
+      // Call DELETE API
+      const response = await fetch(`/api/mentions/track?id=${projectId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        // Remove from local state only after successful API call
+        const updatedProjects = projects.filter(project => project.id !== projectId)
+        setProjects(updatedProjects)
+        
+        // Remove associated tracking items
+        const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        const updatedTracking = existingTracking.filter((item: any) => item.projectId !== projectId)
+        localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+        
+        // Remove associated mentions
+        const updatedMentions = mentionResults.filter(mention => mention.projectId !== projectId)
+        setMentionResults(updatedMentions)
+        localStorage.setItem('mentionResults', JSON.stringify(updatedMentions))
+        
+        toast.success('Project deleted successfully')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to delete project')
+      }
+    } catch (error) {
+      console.error('Delete project error:', error)
+      toast.error('Failed to delete project')
+    }
   }
 
   const editProject = (project: Project) => {
