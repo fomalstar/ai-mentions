@@ -116,6 +116,49 @@
 
 ## **🔴 CURRENT CRITICAL ISSUES**
 
+### Issue #021: AI Scan 404 Error and Wrong Brand Tracking ID
+**Date:** 2025-01-31  
+**Severity:** Critical  
+**Status:** 🟡 IN PROGRESS
+
+**Description:**
+- Scan endpoint returning 404: `api/mentions/scan:1 Failed to load resource: the server responded with a status of 404`
+- Dashboard using wrong brandTrackingId: sending project UI ID instead of database brand tracking ID
+- Projects created with empty topics: `topics: [ '' ]` causing scan failures
+- Data sources showing 0 results: `✅ Loaded 0 data sources`
+
+**Current Logs Show:**
+```
+📋 Request data: {
+  brandTrackingId: '1756751736803',  // Wrong! Should be database ID like 'cmf1gmkj000056zfhvarinyyx'
+  keywordTrackingId: undefined,
+  immediate: true
+}
+```
+
+**Root Cause Analysis:**
+- **Dashboard Scan Call**: Line 484 in dashboard sends `projectId` instead of database `project.id`
+- **Empty Topics**: Projects created without proper topic validation
+- **API Route Issue**: Possible 404 due to wrong ID format or missing route
+
+**Fixes Applied:**
+- ✅ **Fixed brandTrackingId**: Changed `brandTrackingId: projectId` to `brandTrackingId: project.id`
+- ✅ **Project Deletion**: Fixed deleteProject to actually call DELETE API
+- ✅ **Topic Validation**: Enhanced to reject empty/corrupted topics
+
+**Next Steps:**
+1. Deploy updated code to Render
+2. Test scanning with proper brand tracking ID
+3. Add topic validation to project creation form
+4. Verify API endpoints are accessible
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Fixed brandTrackingId in scan call
+- `app/api/mentions/scan/route.ts` - Enhanced topic validation  
+- `components/brand-tracking.tsx` - Fixed delete functionality
+
+---
+
 ### Issue #020: AI Scan Still Reports "No Brand Mention" After Fixes
 **Date:** 2025-01-31  
 **Severity:** Critical  

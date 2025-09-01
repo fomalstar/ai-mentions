@@ -481,7 +481,7 @@ export default function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              brandTrackingId: projectId, 
+              brandTrackingId: project.id, // Use the actual database brand tracking ID
               immediate: true 
             })
           })
@@ -1358,32 +1358,54 @@ export default function Dashboard() {
   }
 
   // Add manual keyword tracking
-  const addManualKeywordTracking = (data: any) => {
-    const trackingItem = {
-      id: Date.now().toString(),
-      projectId: data.projectId,
-      projectName: data.projectName,
-      brandName: data.brandName,
-      keyword: data.keyword,
-      topic: data.topic,
-      addedAt: new Date().toISOString(),
-      status: 'active',
-      lastChecked: null
+  const addManualKeywordTracking = async (data: any) => {
+    try {
+      // Call the API to save to database
+      const response = await fetch('/api/mentions/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandName: data.brandName,
+          keywords: [data.keyword],
+          topics: [data.topic]
+        })
+      })
+
+      if (response.ok) {
+        // Also save to localStorage for local state
+        const trackingItem = {
+          id: Date.now().toString(),
+          projectId: data.projectId,
+          projectName: data.projectName,
+          brandName: data.brandName,
+          keyword: data.keyword,
+          topic: data.topic,
+          addedAt: new Date().toISOString(),
+          status: 'active',
+          lastChecked: null
+        }
+        
+        const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        const updatedTracking = [...existingTracking, trackingItem]
+        localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+        
+        // Update project stats
+        setProjects(prev => prev.map(p => 
+          p.id === data.projectId 
+            ? { ...p, keywordsTracked: p.keywordsTracked + 1 }
+            : p
+        ))
+        
+        setIsAddKeywordModalOpen(false)
+        toast.success('Keyword and topic saved to database')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to save keyword')
+      }
+    } catch (error) {
+      console.error('Add keyword error:', error)
+      toast.error('Failed to save keyword')
     }
-    
-    const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-    const updatedTracking = [...existingTracking, trackingItem]
-    localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
-    
-    // Update project stats
-    setProjects(prev => prev.map(p => 
-      p.id === data.projectId 
-        ? { ...p, keywordsTracked: p.keywordsTracked + 1 }
-        : p
-    ))
-    
-    setIsAddKeywordModalOpen(false)
-    toast.success('Keyword added to tracking')
   }
 
   const renderContent = () => {
