@@ -117,12 +117,13 @@ export async function POST(request: NextRequest) {
           if (isCorrupted) {
             console.warn(`⚠️ Invalid/corrupted topic detected: "${scanTopic}" for keyword: "${keyword.keyword}"`)
             
-            // Try to construct a meaningful topic from the keyword
-            if (keyword.keyword && keyword.keyword.trim().length > 2) {
-              scanTopic = `What are the best ${keyword.keyword} tools and services?`
-              console.log(`🔧 Constructed fallback topic: "${scanTopic}"`)
+            // Use brand name to create meaningful topic (NOT the corrupted keyword)
+            const brandName = brandTracking.displayName || brandTracking.brandName
+            if (brandName && brandName.trim().length > 2) {
+              scanTopic = `What are the best alternatives to ${brandName}? List search engines and similar tools.`
+              console.log(`🔧 Using brand-based fallback topic: "${scanTopic}"`)
             } else {
-              console.error(`❌ Cannot scan: both topic and keyword are invalid`)
+              console.error(`❌ Cannot scan: both topic and brand name are invalid`)
               continue // Skip this keyword
             }
           }

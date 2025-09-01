@@ -147,9 +147,21 @@ export function BrandTracking() {
         return
       }
 
-      // TODO: Implement API call to delete tracking
-      toast.success('Brand tracking removed')
+      // Call DELETE API
+      const response = await fetch(`/api/mentions/track?id=${trackingId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        // Remove from local state
+        setTracking(prev => prev.filter(t => t.id !== trackingId))
+        toast.success('Brand tracking removed')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to remove tracking')
+      }
     } catch (error) {
+      console.error('Delete tracking error:', error)
       toast.error('Failed to remove tracking')
     }
   }
