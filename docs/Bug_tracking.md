@@ -891,5 +891,73 @@ Response: { success: true, message: "Project deleted successfully" }
 
 ---
 
+## Issue #021: AI Scan 404 Error and Frontend-Database ID Synchronization
+**Status**: 🟢 RESOLVED  
+**Priority**: CRITICAL  
+**Date Resolved**: 2025-01-31  
+
+**Description:**
+User reported mention tracking scans failing with `api/mentions/scan:1 Failed to load resource: the server responded with a status of 404` and logs showing wrong `brandTrackingId: '1756752916669'` (UI-generated ID) being sent instead of database ID. Also `topics: [ '' ]` indicating empty topics.
+
+**Root Cause - Frontend-Database ID Synchronization Problem:**
+1. **UI creates project** with timestamp-based ID: `'1756752916669'`
+2. **Database saves project** and returns different ID: `'cmf1hbux30001iu3c0c636n5c'`  
+3. **Frontend ignores database ID** and continues using UI ID in localStorage
+4. **Scan API calls use UI ID** → 404 error (ID doesn't exist in database)
+5. **Multiple scan functions affected**: `startFullProjectScan` and `startFullScanAllProjects`
+6. **Topic persistence failure**: `addManualKeywordTracking` only saved to localStorage, not database
+
+**Critical Code Locations Fixed:**
+```typescript
+// app/dashboard/page.tsx line 484
+brandTrackingId: project.id, // ✅ FIXED: was using UI projectId
+
+// app/dashboard/page.tsx line 634  
+brandTrackingId: project.id, // ✅ FIXED: was using UI projectId
+
+// app/dashboard/page.tsx line 1381
+projectId: databaseProjectId, // ✅ FIXED: now syncs with database
+```
+
+**Resolution Steps Applied:**
+1. ✅ **Fixed scan functions**: Modified both `startFullProjectScan` and `startFullScanAllProjects` to use `project.id` instead of UI `projectId`
+2. ✅ **Fixed topic persistence**: Modified `addManualKeywordTracking` to call `/api/mentions/track` POST endpoint
+3. ✅ **Fixed ID synchronization**: Extract `result.tracking.id` from API response and use in localStorage
+4. ✅ **Updated projects list**: Ensure projects array uses database IDs consistently
+5. ✅ **Deployed fixes**: All changes pushed to Render with commits `5d21898` and `4cc99df`
+
+**Files Modified:**
+- `app/dashboard/page.tsx` (3 critical ID sync fixes)
+
+**Evidence of Fix:**
+- Before: `brandTrackingId: '1756752916669'` (UI timestamp ID)
+- After: `brandTrackingId: 'cmf1hbux30001iu3c0c636n5c'` (Database ID)
+
+**Critical Prevention Rules for Future Developers:**
+- ❗ **NEVER use UI-generated IDs for API calls** - always extract and use database IDs returned from APIs
+- ❗ **Always sync frontend state with backend responses** - don't ignore returned database IDs  
+- ❗ **Test with fresh data** - ID mismatches are common with new projects/data
+- ❗ **Check all scan functions** - multiple functions may call the same API with different ID sources
+- ❗ **Verify localStorage sync** - ensure frontend storage uses database IDs, not UI IDs
+
+**Testing Verification:**
+1. Create new project via "Add Keyword" 
+2. Verify API returns database ID in response
+3. Confirm localStorage stores database ID (not timestamp)
+4. Run scan → Should use database ID → No 404 errors
+5. Check Data Sources populate with real URLs
+
+**Related Files Checked (No Issues Found):**
+- `app/mention-tracking/page.tsx` ✅ - No scan calls, uses demo data
+- `components/enhanced-mention-tracking.tsx` ✅ - Uses database IDs correctly
+
+**Impact:** 
+- ✅ Scans now work correctly without 404 errors
+- ✅ Topics persist to database properly  
+- ✅ Data sources populate with real URLs from AI responses
+- ✅ Frontend and database stay synchronized
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*

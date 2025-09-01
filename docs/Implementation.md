@@ -285,4 +285,102 @@ components/subscription-dashboard.tsx      // Subscription management
 2. **Advanced Analytics**: Implement custom reporting and data visualization
 3. **User Experience**: Enhance UI/UX with advanced features and interactions
 
+---
+
+## **🔧 Critical Technical Fixes (January 2025)**
+
+### **Frontend-Database ID Synchronization Issue**
+
+**Problem Solved:** Mention tracking scans were failing with 404 errors due to frontend-database ID mismatches.
+
+**Technical Root Cause:**
+```typescript
+// PROBLEM: UI generates timestamp IDs
+const projectId = Date.now().toString() // '1756752916669'
+
+// Database saves and returns different ID  
+const response = await fetch('/api/mentions/track', { ... })
+const result = await response.json()
+result.tracking.id // 'cmf1hbux30001iu3c0c636n5c'
+
+// PROBLEM: Frontend ignores database ID, keeps using UI ID
+brandTrackingId: projectId // ❌ 404 Error - ID doesn't exist in DB
+```
+
+**Solution Implemented:**
+```typescript
+// ✅ FIXED: Extract and use database ID
+const result = await response.json()
+const databaseProjectId = result.tracking.id
+
+// ✅ FIXED: Store database ID in localStorage
+const trackingItem = {
+  projectId: databaseProjectId, // Use database ID
+  // ... other fields
+}
+
+// ✅ FIXED: Use database ID for scans
+brandTrackingId: project.id // Database ID, not UI ID
+```
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Lines 484, 634, 1381
+- Commits: `5d21898`, `4cc99df`
+
+**Critical Code Patterns for Future Development:**
+
+**✅ DO THIS - Proper ID Synchronization:**
+```typescript
+// 1. Create with UI ID for immediate UX
+const tempProject = { id: Date.now().toString(), ...data }
+setProjects(prev => [...prev, tempProject])
+
+// 2. Save to database and get real ID
+const response = await fetch('/api/projects', { 
+  method: 'POST', 
+  body: JSON.stringify(data) 
+})
+const result = await response.json()
+const databaseId = result.project.id
+
+// 3. Update UI state with database ID
+setProjects(prev => prev.map(p => 
+  p.id === tempProject.id 
+    ? { ...p, id: databaseId } 
+    : p
+))
+
+// 4. Always use database ID for API calls
+await fetch('/api/scan', {
+  body: JSON.stringify({ projectId: databaseId })
+})
+```
+
+**❌ NEVER DO THIS - Ignoring Database IDs:**
+```typescript
+// ❌ BAD: Using UI ID for API calls
+const uiId = Date.now().toString()
+await fetch('/api/scan', {
+  body: JSON.stringify({ projectId: uiId }) // Will cause 404
+})
+
+// ❌ BAD: Ignoring API response IDs
+const response = await fetch('/api/create', { ... })
+// response.json().id available but ignored
+```
+
+**Database Schema Considerations:**
+- All `brandTracking` records use database-generated UUIDs
+- Frontend must extract and store these IDs from API responses
+- localStorage should never contain UI-generated IDs for database entities
+- Multiple scan functions may exist - check all of them for ID usage
+
+**Testing Strategy:**
+1. Create new projects and verify ID sync
+2. Check browser localStorage for correct database IDs
+3. Monitor network requests for proper ID usage
+4. Test scans with fresh projects (most likely to reveal ID issues)
+
+---
+
 This implementation plan provides a comprehensive roadmap for completing the AI Mentions Platform, with clear stages, dependencies, and success metrics. The current progress shows strong foundation work completed, with the advanced AI features in active development.
