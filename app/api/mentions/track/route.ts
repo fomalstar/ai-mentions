@@ -166,6 +166,75 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get the actual database user ID (not session ID)
+    let dbUser
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, email: true }
+      })
+      
+      if (!dbUser) {
+        console.error('❌ User not found in database for email:', session.user.email)
+        return NextResponse.json({ error: 'User not found in database' }, { status: 404 })
+      }
+      
+      console.log('🔍 Using database user ID:', dbUser.id, 'instead of session ID:', session.user.id)
+    } catch (userError) {
+      console.error('❌ Failed to find user in database:', userError)
+      return NextResponse.json({ error: 'Failed to find user in database' }, { status: 500 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const brandTrackingId = searchParams.get('id')
+
+    if (!brandTrackingId) {
+      return NextResponse.json({ error: 'Brand tracking ID is required' }, { status: 400 })
+    }
+
+    console.log('🗑️ Deleting brand tracking:', brandTrackingId)
+
+    // Check if brand tracking exists and belongs to user
+    const brandTracking = await prisma.brandTracking.findFirst({
+      where: {
+        id: brandTrackingId,
+        userId: dbUser.id
+      }
+    })
+
+    if (!brandTracking) {
+      return NextResponse.json({ error: 'Brand tracking not found' }, { status: 404 })
+    }
+
+    // Delete brand tracking (cascade will handle related records)
+    await prisma.brandTracking.delete({
+      where: { id: brandTrackingId }
+    })
+
+    console.log('✅ Brand tracking deleted successfully:', brandTrackingId)
+
+    return NextResponse.json({ 
+      success: true,
+      message: `Project "${brandTracking.displayName}" deleted successfully`
+    })
+
+  } catch (error) {
+    console.error('Delete brand tracking error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to delete brand tracking',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession()

@@ -118,6 +118,53 @@
 
 ---
 
+### Issue #019: Missing DELETE Endpoint for Project Removal (RESOLVED)
+**Date:** 2025-01-31  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Projects cannot be permanently deleted - they reappear after page refresh
+- Delete button in frontend has no corresponding backend endpoint
+- No way to remove brand tracking entries from database
+- Projects appear to be deleted but persist in the database
+
+**Root Cause:**
+- `/api/mentions/track` route only had POST (create/update) and GET (read) methods
+- Missing DELETE method to handle project removal requests
+- Frontend delete functionality had no backend support
+- No cascade deletion mechanism for related data
+
+**Resolution:**
+- ✅ **Added DELETE method** - Implemented DELETE endpoint in `/api/mentions/track` route
+- ✅ **User authorization** - Ensures only project owner can delete their projects
+- ✅ **Database user ID handling** - Uses correct database user ID for deletion
+- ✅ **Cascade deletion** - Relies on Prisma schema cascade rules to clean up related data
+- ✅ **Error handling** - Proper validation and error responses
+
+**Files Modified:**
+- `app/api/mentions/track/route.ts` - Added DELETE method for brand tracking removal
+- `docs/Bug_tracking.md` - Documented solution
+
+**Prevention:**
+- Always implement full CRUD operations (Create, Read, Update, Delete) for data entities
+- Test delete functionality during development
+- Verify cascade deletion works properly for related data
+
+**API Usage:**
+```
+DELETE /api/mentions/track?id=<brandTrackingId>
+Authorization: Required (session-based)
+Response: { success: true, message: "Project deleted successfully" }
+```
+
+**Impact:**
+- ✅ **Projects now delete permanently** - No more phantom projects after refresh
+- ✅ **Clean database** - Related keyword tracking and scan data removed via cascade
+- ✅ **Complete CRUD functionality** - Full project lifecycle management
+
+---
+
 ### Issue #018: Missing scan_result Table Causing Status Route 500 Errors (RESOLVED)
 **Date:** 2025-01-31  
 **Severity:** High  
