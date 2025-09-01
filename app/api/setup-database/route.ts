@@ -53,19 +53,19 @@ export async function POST(request: NextRequest) {
         await prisma.$executeRaw`
           CREATE TABLE IF NOT EXISTS scan_result (
             id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            brand_tracking_id TEXT NOT NULL,
-            keyword_tracking_id TEXT NOT NULL,
+            "userId" TEXT NOT NULL,
+            "brandTrackingId" TEXT NOT NULL,
+            "keywordTrackingId" TEXT NOT NULL,
             platform TEXT NOT NULL,
             query TEXT NOT NULL,
-            brand_mentioned BOOLEAN DEFAULT false,
+            "brandMentioned" BOOLEAN DEFAULT false,
             position INTEGER,
-            response_text TEXT,
-            brand_context TEXT,
-            source_urls JSONB,
+            "responseText" TEXT,
+            "brandContext" TEXT,
+            "sourceUrls" JSONB,
             confidence DOUBLE PRECISION,
-            scan_duration INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            "scanDuration" INTEGER,
+            "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `
         
@@ -73,21 +73,21 @@ export async function POST(request: NextRequest) {
         await prisma.$executeRaw`
           CREATE TABLE IF NOT EXISTS scan_queue (
             id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            brand_tracking_id TEXT NOT NULL,
-            keyword_tracking_id TEXT,
+            "userId" TEXT NOT NULL,
+            "brandTrackingId" TEXT NOT NULL,
+            "keywordTrackingId" TEXT,
             status TEXT DEFAULT 'pending',
             priority INTEGER DEFAULT 5,
-            scheduled_at TIMESTAMP NOT NULL,
-            started_at TIMESTAMP,
-            completed_at TIMESTAMP,
+            "scheduledAt" TIMESTAMP NOT NULL,
+            "startedAt" TIMESTAMP,
+            "completedAt" TIMESTAMP,
             attempts INTEGER DEFAULT 0,
-            max_attempts INTEGER DEFAULT 3,
-            last_error TEXT,
-            scan_type TEXT NOT NULL,
+            "maxAttempts" INTEGER DEFAULT 3,
+            "lastError" TEXT,
+            "scanType" TEXT NOT NULL,
             metadata JSONB,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `
         
