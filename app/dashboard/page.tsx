@@ -476,12 +476,27 @@ export default function Dashboard() {
         console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
         
         try {
-          // Call the real AI scanning API
+          // Find the actual database keywordTrackingId by matching keyword and topic
+          const projectData = projects.find(p => p.id === projectId)
+          let keywordTrackingId = undefined
+          
+          if (projectData && projectData.keywordTracking) {
+            const matchingKeyword = projectData.keywordTracking.find(k => 
+              k.keyword === trackingItem.keyword && k.topic === trackingItem.topic
+            )
+            if (matchingKeyword) {
+              keywordTrackingId = matchingKeyword.id
+              console.log(`🎯 Found database keywordTrackingId: ${keywordTrackingId} for keyword: ${trackingItem.keyword}`)
+            }
+          }
+          
+          // Call the real AI scanning API - scan ONLY this specific keyword if we found the ID
           const scanResponse = await fetch('/api/mentions/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               brandTrackingId: project.id, // Use the actual database brand tracking ID
+              keywordTrackingId: keywordTrackingId, // Scan ONLY this specific keyword (or undefined to scan all)
               immediate: true 
             })
           })

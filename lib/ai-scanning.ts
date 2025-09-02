@@ -91,7 +91,7 @@ export class AIScanningService {
     const startTime = Date.now()
     
     try {
-      console.log(`🔍 Querying Perplexity with topic: "${request.topic}" and brand: "${request.brandName}"`)
+      console.log(`🔍 Querying Perplexity with topic: "${request.topic}"`)
       
       const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
@@ -104,7 +104,7 @@ export class AIScanningService {
           messages: [
             {
               role: 'user',
-              content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
             }
           ]
         })
@@ -145,15 +145,17 @@ export class AIScanningService {
               'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              model: 'sonar-pro',
-              messages: [
-                {
-                  role: 'user',
-                  content: `Can you provide source URLs for information about "${request.topic}"? Please list actual website URLs where this information can be found.`
-                }
-              ]
-            })
+                          body: JSON.stringify({
+                model: 'sonar-pro',
+                messages: [
+                  {
+                    role: 'user',
+                    content: `For the topic "${request.topic}", please provide specific website URLs where I can find detailed information. List actual working URLs (not just domain names) that contain relevant content about this topic. Format: 1. [URL] - [Brief description] 2. [URL] - [Brief description]`
+                  }
+                ],
+                max_tokens: 800,
+                temperature: 0.3
+              })
           })
           
           if (sourceResponse.ok) {
@@ -192,7 +194,7 @@ export class AIScanningService {
     const startTime = Date.now()
     
     try {
-      console.log(`🔍 Querying ChatGPT with topic: "${request.topic}" and brand: "${request.brandName}"`)
+      console.log(`🔍 Querying ChatGPT with topic: "${request.topic}"`)
       
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -205,7 +207,7 @@ export class AIScanningService {
           messages: [
             {
               role: 'user',
-              content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
             }
           ],
           max_completion_tokens: 2000,  // Use max_completion_tokens instead of max_tokens
@@ -237,17 +239,17 @@ export class AIScanningService {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'user',
-                content: `Can you provide source URLs for information about "${request.topic}"? Please list actual website URLs where this information can be found.`
-              }
-            ],
-            max_completion_tokens: 500,
-            temperature: 0.7
-          })
+                      body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'user',
+                  content: `For the topic "${request.topic}", please provide specific website URLs where I can find detailed information. List actual working URLs (not just domain names) that contain relevant content about this topic. Format: 1. [URL] - [Brief description] 2. [URL] - [Brief description]`
+                }
+              ],
+              max_completion_tokens: 800,
+              temperature: 0.3
+            })
         })
         
         if (sourceResponse.ok) {
@@ -285,7 +287,7 @@ export class AIScanningService {
     const startTime = Date.now()
     
     try {
-      console.log(`🔍 Querying Gemini with topic: "${request.topic}" and brand: "${request.brandName}"`)
+      console.log(`🔍 Querying Gemini with topic: "${request.topic}"`)
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
         method: 'POST',
@@ -297,7 +299,7 @@ export class AIScanningService {
             {
               parts: [
                 {
-                  text: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+                  text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
                 }
               ]
             }
@@ -361,6 +363,14 @@ export class AIScanningService {
     
     // Check if brand is mentioned
     if (!normalizedResponse.includes(normalizedBrand)) {
+      return { brandMentioned: false, position: null, confidence: 0, context: null }
+    }
+
+    // NEW: Check if brand mention is contextually relevant
+    // If brand appears in a generic list (like search engines) but topic is unrelated, it's not relevant
+    const isGenericListMention = this.isGenericListMention(responseText, brandName)
+    if (isGenericListMention) {
+      console.log(`⚠️ Brand "${brandName}" found in generic list but not relevant to topic - marking as not mentioned`)
       return { brandMentioned: false, position: null, confidence: 0, context: null }
     }
 
@@ -433,6 +443,40 @@ export class AIScanningService {
       confidence,
       context
     }
+  }
+
+  /**
+   * Check if brand mention is in a generic list (not contextually relevant)
+   */
+  private isGenericListMention(responseText: string, brandName: string): boolean {
+    const text = responseText.toLowerCase()
+    const brand = brandName.toLowerCase()
+    
+    // Common generic lists where brands appear but aren't relevant to the topic
+    const genericListPatterns = [
+      // Search engines list
+      new RegExp(`(google|bing|yandex|duckduckgo|yahoo|baidu|qwant|startpage|searx|ecosia)`, 'gi'),
+      // Social media list  
+      new RegExp(`(facebook|twitter|instagram|linkedin|youtube|tiktok|snapchat|pinterest|reddit|discord)`, 'gi'),
+      // Tech companies list
+      new RegExp(`(apple|microsoft|google|amazon|meta|netflix|tesla|uber|airbnb|spotify)`, 'gi'),
+      // Browser list
+      new RegExp(`(chrome|firefox|safari|edge|opera|brave|vivaldi|tor)`, 'gi')
+    ]
+    
+    // Check if the text contains a generic list pattern
+    for (const pattern of genericListPatterns) {
+      const matches = text.match(pattern)
+      if (matches && matches.length >= 3) { // At least 3 items in the list
+        // Check if our brand is one of the items in this generic list
+        if (matches.some(match => match.toLowerCase().includes(brand))) {
+          console.log(`🔍 Brand "${brandName}" found in generic list: ${matches.join(', ')}`)
+          return true
+        }
+      }
+    }
+    
+    return false
   }
 
   /**

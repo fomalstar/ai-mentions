@@ -4,6 +4,97 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { aiScanningService } from '@/lib/ai-scanning'
 
+// Helper function to scan a single keyword
+async function scanSingleKeyword(keyword: any, brandTracking: any, dbUser: any) {
+  try {
+    // Validate and clean the topic
+    let scanTopic = keyword.topic
+    
+    // Check if topic is corrupted or invalid
+    const cleanTopic = scanTopic ? scanTopic.trim().toLowerCase() : ''
+    const isCorrupted = !scanTopic || 
+                      cleanTopic === '' || 
+                      ['ergerg', 'tewgw', 'gerg', 'sdgd', 'ewg', 'gsgsg'].includes(cleanTopic) ||
+                      (cleanTopic.length < 5 && !/^(ai|seo|web|app|api)$/i.test(cleanTopic)) // Reject short gibberish but allow valid short terms
+    
+    if (isCorrupted) {
+      console.warn(`⚠️ Invalid/corrupted topic detected: "${scanTopic}" for keyword: "${keyword.keyword}"`)
+      
+      // Use brand name to create meaningful topic (NOT the corrupted keyword)
+      const brandName = brandTracking.displayName || brandTracking.brandName
+      if (brandName && brandName.trim().length > 2) {
+        scanTopic = `What are the best alternatives to ${brandName}? List search engines and similar tools.`
+        console.log(`🔧 Using brand-based fallback topic: "${scanTopic}"`)
+      } else {
+        console.error(`❌ Cannot scan: both topic and brand name are invalid`)
+        return {
+          keywordTrackingId: keyword.id,
+          keyword: keyword.keyword,
+          error: 'Topic is corrupted and brand name is invalid',
+          results: []
+        }
+      }
+    }
+    
+    console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${scanTopic}`)
+    
+    // Proceed with available API keys; platforms without keys will return error result
+    
+    const scanResults = await aiScanningService.scanKeyword({
+      userId: dbUser.id,  // Use database user ID
+      brandTrackingId: brandTracking.id,
+      keywordTrackingId: keyword.id,
+      brandName: brandTracking.displayName,
+      keyword: keyword.keyword,
+      topic: scanTopic // Use the validated/cleaned topic
+    })
+    
+    console.log(`✅ AI scan completed for keyword: ${keyword.keyword}`)
+    
+    // Persist results
+    try {
+      await aiScanningService.storeScanResults({
+        userId: dbUser.id,
+        brandTrackingId: brandTracking.id,
+        keywordTrackingId: keyword.id,
+        brandName: brandTracking.displayName,
+        keyword: keyword.keyword,
+        topic: scanTopic
+      }, scanResults)
+    } catch (storeErr) {
+      console.warn('Failed to persist scan results:', storeErr instanceof Error ? storeErr.message : storeErr)
+    }
+
+    return {
+      keywordTrackingId: keyword.id,
+      keyword: keyword.keyword,
+      results: scanResults
+    }
+
+  } catch (error) {
+    console.error(`❌ Scan error for keyword ${keyword.keyword}:`, error)
+    
+    // Create a fallback result instead of crashing
+    return {
+      keywordTrackingId: keyword.id,
+      keyword: keyword.keyword,
+      error: error instanceof Error ? error.message : 'Scan failed',
+      results: [
+        {
+          platform: 'error',
+          brandMentioned: false,
+          position: null,
+          responseText: `Scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          sourceUrls: [],
+          scanDuration: 0,
+          confidence: 0,
+          brandContext: null
+        }
+      ]
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Scan route called with request')
@@ -99,90 +190,28 @@ export async function POST(request: NextRequest) {
     }
 
     if (immediate) {
-      // Start immediate scan
+      // Start immediate scan - ONLY scan the specific keyword if keywordTrackingId is provided
       const results = []
       
-      for (const keyword of brandTracking.keywordTracking) {
-        try {
-          // Validate and clean the topic
-          let scanTopic = keyword.topic
-          
-          // Check if topic is corrupted or invalid
-          const cleanTopic = scanTopic ? scanTopic.trim().toLowerCase() : ''
-          const isCorrupted = !scanTopic || 
-                            cleanTopic === '' || 
-                            ['ergerg', 'tewgw', 'gerg', 'sdgd', 'ewg', 'gsgsg'].includes(cleanTopic) ||
-                            (cleanTopic.length < 5 && !/^(ai|seo|web|app|api)$/i.test(cleanTopic)) // Reject short gibberish but allow valid short terms
-          
-          if (isCorrupted) {
-            console.warn(`⚠️ Invalid/corrupted topic detected: "${scanTopic}" for keyword: "${keyword.keyword}"`)
-            
-            // Use brand name to create meaningful topic (NOT the corrupted keyword)
-            const brandName = brandTracking.displayName || brandTracking.brandName
-            if (brandName && brandName.trim().length > 2) {
-              scanTopic = `What are the best alternatives to ${brandName}? List search engines and similar tools.`
-              console.log(`🔧 Using brand-based fallback topic: "${scanTopic}"`)
-            } else {
-              console.error(`❌ Cannot scan: both topic and brand name are invalid`)
-              continue // Skip this keyword
-            }
-          }
-          
-          console.log(`🔍 Starting AI scan for keyword: ${keyword.keyword}, topic: ${scanTopic}`)
-          
-          // Proceed with available API keys; platforms without keys will return error result
-          
-          const scanResults = await aiScanningService.scanKeyword({
-            userId: dbUser.id,  // Use database user ID
-            brandTrackingId: brandTracking.id,
-            keywordTrackingId: keyword.id,
-            brandName: brandTracking.displayName,
-            keyword: keyword.keyword,
-            topic: scanTopic // Use the validated/cleaned topic
-          })
-          
-          console.log(`✅ AI scan completed for keyword: ${keyword.keyword}`)
-          
-          results.push({
-            keywordTrackingId: keyword.id,
-            keyword: keyword.keyword,
-            results: scanResults
-          })
-
-          // Persist results
-          try {
-            await aiScanningService.storeScanResults({
-              userId: dbUser.id,
-              brandTrackingId: brandTracking.id,
-              keywordTrackingId: keyword.id,
-              brandName: brandTracking.displayName,
-              keyword: keyword.keyword,
-              topic: scanTopic
-            }, scanResults)
-          } catch (storeErr) {
-            console.warn('Failed to persist scan results:', storeErr instanceof Error ? storeErr.message : storeErr)
-          }
-        } catch (error) {
-          console.error(`❌ Scan error for keyword ${keyword.keyword}:`, error)
-          
-          // Create a fallback result instead of crashing
-          results.push({
-            keywordTrackingId: keyword.id,
-            keyword: keyword.keyword,
-            error: error instanceof Error ? error.message : 'Scan failed',
-            results: [
-              {
-                platform: 'error',
-                brandMentioned: false,
-                position: null,
-                responseText: `Scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                sourceUrls: [],
-                scanDuration: 0,
-                confidence: 0,
-                brandContext: null
-              }
-            ]
-          })
+      // If keywordTrackingId is provided, only scan that specific keyword
+      if (keywordTrackingId) {
+        const specificKeyword = brandTracking.keywordTracking.find(k => k.id === keywordTrackingId)
+        if (specificKeyword) {
+          console.log(`🎯 Scanning specific keyword: ${specificKeyword.keyword}`)
+          const result = await scanSingleKeyword(specificKeyword, brandTracking, dbUser)
+          results.push(result)
+        } else {
+          return NextResponse.json({ 
+            error: 'Keyword not found',
+            details: `Keyword with ID ${keywordTrackingId} not found in brand tracking`
+          }, { status: 404 })
+        }
+      } else {
+        // If no specific keyword requested, scan ALL keywords (legacy behavior)
+        console.log(`⚠️ No specific keyword requested - scanning ALL ${brandTracking.keywordTracking.length} keywords`)
+        for (const keyword of brandTracking.keywordTracking) {
+          const result = await scanSingleKeyword(keyword, brandTracking, dbUser)
+          results.push(result)
         }
       }
 
