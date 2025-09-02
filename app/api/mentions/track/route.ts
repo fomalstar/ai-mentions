@@ -492,11 +492,6 @@ function generateDemoTracking(brandName: string) {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-    keywords: [
-      { keyword: 'ai marketing', isActive: true },
-      { keyword: 'automation', isActive: true },
-      { keyword: 'digital transformation', isActive: true }
-    ],
     mentions: generateDemoMentions(brandName, ['ai marketing', 'automation', 'digital transformation'])
   }
 }
