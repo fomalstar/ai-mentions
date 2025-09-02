@@ -1343,7 +1343,7 @@ export default function Dashboard() {
   const removeTopicFromTracking = async (projectId: string, topic: any) => {
     try {
       // Call the API to delete the keyword from database
-      const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${topic.keyword}`, {
+      const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${encodeURIComponent(topic.keyword)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       })

@@ -1005,5 +1005,59 @@ After fixing the ID synchronization issue, scans are working but revealing new p
 
 ---
 
+## Issue #023: URL Encoding Issue with Keywords Containing Special Characters
+**Status**: 🟢 RESOLVED  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+Users cannot remove keywords from mention tracking due to 404 errors. The error occurs when keywords contain special characters like colons (`:`) in the URL parameters.
+
+**Error Details:**
+```
+Failed to load resource: the server responded with a status of 404 ()
+api/mentions/track?keywordId=1756753899159&keyword=yandex:1
+```
+
+**Root Cause:**
+The frontend was sending keywords with special characters (like colons) directly in URL parameters without proper URL encoding. When the server receives a request like:
+```
+/api/mentions/track?keywordId=1756753899159&keyword=yandex:1
+```
+
+The colon in `yandex:1` is interpreted as a query parameter separator, causing the server to receive:
+- `keywordId=1756753899159`
+- `keyword=yandex` 
+- `1` (as a separate malformed parameter)
+
+This results in a 404 error because the server cannot properly parse the request.
+
+**Resolution:**
+Added `encodeURIComponent()` to properly URL-encode the keyword parameter in the `removeTopicFromTracking` function.
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Added `encodeURIComponent(topic.keyword)` in DELETE request
+
+**Code Change:**
+```typescript
+// Before (causing 404 errors):
+const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${topic.keyword}`, {
+
+// After (fixed):
+const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${encodeURIComponent(topic.keyword)}`, {
+```
+
+**Testing Verification:**
+1. Keywords with special characters (colons, spaces, ampersands, etc.) now properly encode
+2. DELETE requests to `/api/mentions/track` work correctly
+3. Keywords can be removed from mention tracking without 404 errors
+
+**Prevention Strategy:**
+- **ALWAYS** use `encodeURIComponent()` when passing dynamic values in URL parameters
+- **NEVER** assume keywords or other user input are safe for direct URL inclusion
+- **TEST** with various special characters to ensure proper encoding
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*
