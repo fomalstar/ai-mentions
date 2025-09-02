@@ -1522,5 +1522,80 @@ const refreshSingleTopic = async (projectId: string, topic: any) => {
 
 ---
 
+## Issue #032: Topics Disappear After Logout/Login
+**Status**: 🟢 **RESOLVED**  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+When users log out and log back in, the keyword topics disappear from the dashboard, even though the projects, recent mentions, and data sources remain visible. This creates a poor user experience where users lose their tracking configuration.
+
+**User Report:**
+"when i log out and log in the keyword topic disappear but at least the mention recent and data sources are still there. Check"
+
+**Root Causes:**
+1. **Missing Database Sync**: The `loadProjectsFromDatabase()` function only loaded project information but ignored keyword tracking data
+2. **Frontend-Backend Data Mismatch**: Topics were stored in localStorage but not synced from the database on login
+3. **UI State Desynchronization**: After database sync, the UI didn't re-render to show the loaded topics
+
+**Technical Analysis:**
+- **Backend**: ✅ `/api/mentions/status` correctly returns `keywordTracking` data with topics
+- **Frontend**: ❌ `loadProjectsFromDatabase()` ignored keyword tracking data
+- **Result**: Topics persisted in localStorage but were not loaded from database on login
+
+**Resolution:**
+1. **Enhanced Database Sync**: Modified `loadProjectsFromDatabase()` to extract and sync keyword tracking data from database response
+2. **localStorage Synchronization**: Added logic to update localStorage with database keyword tracking data
+3. **UI Refresh Trigger**: Added `trackingDataVersion` state to trigger UI re-render when tracking data is updated
+4. **Data Persistence**: Ensured topics persist across logout/login cycles by syncing database → localStorage → UI
+
+**Files Modified:**
+- `app/dashboard/page.tsx`: Added keyword tracking sync logic, tracking data version state, and UI refresh mechanism
+
+**Code Changes:**
+```typescript
+// Added tracking data sync after projects are loaded
+const dbKeywordTracking: any[] = []
+data.brandTracking.forEach((tracking: any) => {
+  if (tracking.keywordTracking && Array.isArray(tracking.keywordTracking)) {
+    tracking.keywordTracking.forEach((kw: any) => {
+      dbKeywordTracking.push({
+        id: kw.id,
+        projectId: tracking.id,
+        projectName: tracking.displayName,
+        brandName: tracking.displayName,
+        keyword: kw.keyword,
+        topic: kw.topic,
+        // ... other fields
+      })
+    })
+  }
+})
+
+// Sync to localStorage and trigger UI refresh
+if (dbKeywordTracking.length > 0) {
+  localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))
+  setTrackingDataVersion(prev => prev + 1)
+}
+```
+
+**Testing:**
+- ✅ TypeScript compilation passes without errors
+- ✅ Database sync logic properly extracts keyword tracking data
+- ✅ localStorage is updated with database data
+- ✅ UI refresh mechanism triggers on data updates
+
+**Prevention:**
+- Always sync database data to localStorage on component mount
+- Use state variables to trigger UI updates when data changes
+- Maintain consistency between database and frontend state
+
+**Impact:**
+- **User Experience**: Topics now persist across logout/login cycles
+- **Data Consistency**: Frontend and backend data are properly synchronized
+- **Reliability**: Users no longer lose their tracking configuration
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*

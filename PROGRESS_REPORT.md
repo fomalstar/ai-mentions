@@ -80,6 +80,7 @@
 - ✅ **Topic Removal API Fix**: Resolved 404 errors by fixing parameter mismatch between frontend and backend
 - ✅ **Scanning Loop Fix**: Resolved infinite scanning loop by implementing priority-based keyword selection
 - ✅ **Individual Topic Refresh**: Added refresh button for each topic with spinning animation and single-topic scanning
+- ✅ **Topics Persistence Fix**: Resolved issue where topics disappeared after logout/login by implementing database-to-localStorage sync
 
 ### ✅ **SaaS Dashboard Experience (100% Complete)**
 - **Project Management System**: Create and manage multiple projects/websites

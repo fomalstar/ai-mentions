@@ -133,6 +133,9 @@ export default function Dashboard() {
   
   // Topic refresh state
   const [refreshingTopics, setRefreshingTopics] = useState<Set<string>>(new Set())
+  
+  // Tracking data refresh state
+  const [trackingDataVersion, setTrackingDataVersion] = useState(0)
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -146,6 +149,13 @@ export default function Dashboard() {
     // Also clean up any orphaned localStorage items on component mount
     cleanupOrphanedLocalStorageItems()
   }, [])
+  
+  // Re-render when tracking data is updated from database
+  useEffect(() => {
+    if (trackingDataVersion > 0) {
+      console.log('🔄 Tracking data updated, triggering UI refresh...')
+    }
+  }, [trackingDataVersion])
 
   const fetchDataSources = async () => {
     try {
@@ -802,6 +812,46 @@ export default function Dashboard() {
           
           console.log(`✅ Loaded ${dbProjects.length} projects from database`)
           setProjects(dbProjects)
+          
+          // SYNC KEYWORD TRACKING DATA: Load topics from database and sync with localStorage
+          console.log('🔄 Syncing keyword tracking data from database...')
+          const dbKeywordTracking: any[] = []
+          
+          data.brandTracking.forEach((tracking: any) => {
+            if (tracking.keywordTracking && Array.isArray(tracking.keywordTracking)) {
+              tracking.keywordTracking.forEach((kw: any) => {
+                dbKeywordTracking.push({
+                  id: kw.id,
+                  projectId: tracking.id,
+                  projectName: tracking.displayName,
+                  brandName: tracking.displayName,
+                  keyword: kw.keyword,
+                  topic: kw.topic,
+                  addedAt: kw.createdAt ? new Date(kw.createdAt).toISOString() : new Date().toISOString(),
+                  status: 'active',
+                  lastChecked: kw.lastScanAt ? new Date(kw.lastScanAt).toISOString() : null,
+                  // Database-specific fields
+                  avgPosition: kw.avgPosition,
+                  chatgptPosition: kw.chatgptPosition,
+                  perplexityPosition: kw.perplexityPosition,
+                  geminiPosition: kw.geminiPosition,
+                  positionChange: kw.positionChange,
+                  scanCount: kw.scanCount
+                })
+              })
+            }
+          })
+          
+          console.log(`✅ Loaded ${dbKeywordTracking.length} keyword tracking items from database`)
+          
+          // Update localStorage with database data (this ensures topics persist after logout/login)
+          if (dbKeywordTracking.length > 0) {
+            localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))
+            console.log('💾 Synced keyword tracking data to localStorage')
+            
+            // Trigger UI refresh to show the loaded topics
+            setTrackingDataVersion(prev => prev + 1)
+          }
           
           // Calculate stats from loaded projects
           const totalProjects = dbProjects.length
