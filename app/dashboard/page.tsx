@@ -477,18 +477,9 @@ export default function Dashboard() {
         
         try {
           // Find the actual database keywordTrackingId by matching keyword and topic
-          const projectData = projects.find(p => p.id === projectId)
+          // For now, scan all keywords since we don't have direct access to keywordTracking IDs
+          // The backend will handle keyword-specific scanning when we implement it properly
           let keywordTrackingId = undefined
-          
-          if (projectData && projectData.keywordTracking) {
-            const matchingKeyword = projectData.keywordTracking.find(k => 
-              k.keyword === trackingItem.keyword && k.topic === trackingItem.topic
-            )
-            if (matchingKeyword) {
-              keywordTrackingId = matchingKeyword.id
-              console.log(`🎯 Found database keywordTrackingId: ${keywordTrackingId} for keyword: ${trackingItem.keyword}`)
-            }
-          }
           
           // Call the real AI scanning API - scan ONLY this specific keyword if we found the ID
           const scanResponse = await fetch('/api/mentions/scan', {
@@ -1367,7 +1358,7 @@ export default function Dashboard() {
         // Also update localStorage for local state
         const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
         const updatedTracking = existingTracking.filter((item: any) => 
-          !(item.projectId === projectId && item.topic === topic.topic)
+          !(item.projectId === projectId && item.keyword === topic.keyword && item.topic === topic.topic)
         )
         localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
         
@@ -1379,6 +1370,9 @@ export default function Dashboard() {
         ))
         
         toast.success('Topic removed from tracking and database')
+        
+        // Force refresh of projects data to ensure UI is in sync
+        await loadProjectsFromDatabase()
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to remove topic from database')

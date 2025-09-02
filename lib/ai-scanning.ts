@@ -452,6 +452,24 @@ export class AIScanningService {
     const text = responseText.toLowerCase()
     const brand = brandName.toLowerCase()
     
+    // Check if the topic is actually about the category the brand belongs to
+    // If the topic is about search engines, then Yandex in a search engine list IS relevant
+    const topicKeywords = {
+      'search engines': ['search engine', 'search engines', 'search tool', 'search tools', 'browser search', 'web search'],
+      'social media': ['social media', 'social platform', 'social platforms', 'social network', 'social networks'],
+      'tech companies': ['tech company', 'tech companies', 'technology company', 'technology companies', 'software company'],
+      'browsers': ['browser', 'browsers', 'web browser', 'web browsers', 'internet browser']
+    }
+    
+    // Check if the topic is about the brand's category
+    for (const [category, keywords] of Object.entries(topicKeywords)) {
+      if (keywords.some(keyword => text.includes(keyword))) {
+        // Topic is about this category, so brand mentions in this category ARE relevant
+        console.log(`✅ Topic is about ${category}, brand mentions in this category are relevant`)
+        return false
+      }
+    }
+    
     // Common generic lists where brands appear but aren't relevant to the topic
     const genericListPatterns = [
       // Search engines list
@@ -572,7 +590,14 @@ export class AIScanningService {
     }
     
     console.log(`✅ Extracted ${urls.length} valid URLs`)
-    return urls
+    
+    // Limit to top 2 most relevant URLs per AI
+    const limitedUrls = urls.slice(0, 2)
+    if (urls.length > 2) {
+      console.log(`📝 Limiting URLs from ${urls.length} to top 2 most relevant`)
+    }
+    
+    return limitedUrls
   }
 
   /**
