@@ -130,6 +130,9 @@ export default function Dashboard() {
   const [keywordInput, setKeywordInput] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [keywordResults, setKeywordResults] = useState<any>(null)
+  
+  // Topic refresh state
+  const [refreshingTopics, setRefreshingTopics] = useState<Set<string>>(new Set())
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -639,15 +642,17 @@ export default function Dashboard() {
           console.log(`Scanning topic: ${trackingItem.topic} for keyword: ${trackingItem.keyword}`)
           
           try {
-                                             // Call the real AI scanning API
-           const scanResponse = await fetch('/api/mentions/scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              brandTrackingId: project.id, // Use the actual database brand tracking ID
-              immediate: true 
+            // Call the real AI scanning API - scan ONLY this specific keyword by matching keyword and topic
+            const scanResponse = await fetch('/api/mentions/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                brandTrackingId: project.id, // Use the actual database brand tracking ID
+                keyword: trackingItem.keyword, // Send the specific keyword to scan
+                topic: trackingItem.topic, // Send the specific topic to scan
+                immediate: true 
+              })
             })
-          })
             
             if (scanResponse.ok) {
               const scanData = await scanResponse.json()
@@ -1391,6 +1396,57 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Remove topic error:', error)
       toast.error('Failed to remove topic')
+    }
+  }
+
+  // Refresh a single topic by scanning it
+  const refreshSingleTopic = async (projectId: string, topic: any) => {
+    try {
+      const topicKey = `${projectId}-${topic.keyword}-${topic.topic}`
+      setRefreshingTopics(prev => new Set(prev).add(topicKey))
+      
+      console.log(`🔄 Refreshing single topic: ${topic.topic} for keyword: ${topic.keyword}`)
+      
+      // Find the project to get the brand tracking ID
+      const project = projects.find(p => p.id === projectId)
+      if (!project) {
+        throw new Error('Project not found')
+      }
+      
+      // Call the scan API for this specific topic
+      const scanResponse = await fetch('/api/mentions/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          brandTrackingId: project.id,
+          keyword: topic.keyword,
+          topic: topic.topic,
+          immediate: true 
+        })
+      })
+      
+      if (scanResponse.ok) {
+        const scanData = await scanResponse.json()
+        console.log(`✅ Single topic scan completed for ${topic.topic}`)
+        toast.success(`Topic "${topic.topic}" refreshed successfully`)
+        
+        // Refresh projects data to show updated results
+        await loadProjectsFromDatabase()
+      } else {
+        const errorData = await scanResponse.json()
+        console.error(`❌ Single topic scan failed:`, errorData)
+        toast.error(`Failed to refresh topic: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error(`❌ Error refreshing single topic:`, error)
+      toast.error(`Failed to refresh topic: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      const topicKey = `${projectId}-${topic.keyword}-${topic.topic}`
+      setRefreshingTopics(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(topicKey)
+        return newSet
+      })
     }
   }
 
@@ -2387,7 +2443,17 @@ export default function Dashboard() {
                                                 <Badge variant="outline" className="text-xs">
                                                   {hasMentions ? `${analytics.totalMentions} mentions` : 'Monitoring'}
                                                 </Badge>
-                                                {/* Removed expand toggle button per request */}
+                                                {/* Refresh button for single topic scan */}
+                                                <Button 
+                                                  variant="ghost" 
+                                                  size="sm"
+                                                  onClick={() => refreshSingleTopic(projectId, topic)}
+                                                  disabled={refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`)}
+                                                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                                >
+                                                  <RefreshCw className={`w-4 h-4 ${refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ? 'animate-spin' : ''}`} />
+                                                </Button>
+                                                {/* Remove topic button */}
                                                 <Button 
                                                   variant="ghost" 
                                                   size="sm"

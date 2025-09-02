@@ -1367,5 +1367,160 @@ if (keyword && topic) {
 
 ---
 
+## Issue #030: Scanning Loop - Keywords Scanned Multiple Times
+**Status**: 🟢 **RESOLVED**  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+When adding 2 keywords and starting scanning, the system was scanning the first keyword, then the second, then coming back to scan the first again, creating an infinite loop. This caused excessive API calls and wasted resources.
+
+**Error Details:**
+- Keywords scanned multiple times instead of once
+- Scanning loop: first → second → first → second → repeat
+- Excessive API calls to AI services
+- Wasted computational resources
+
+**Root Causes:**
+1. **Frontend scan call missing keywordTrackingId**: The second scan call in `app/dashboard/page.tsx` was missing the `keywordTrackingId` parameter
+2. **Backend scanning ALL keywords**: When no specific keyword was specified, the backend was scanning ALL keywords instead of just the requested one
+3. **Missing keyword+topic matching**: The scan API didn't support finding keywords by keyword text and topic combination
+
+**Resolution:**
+1. **Enhanced scan API parameters**: Added support for `keyword` and `topic` parameters in addition to `keywordTrackingId`
+2. **Priority-based scanning logic**: Implemented 3-tier priority system:
+   - Priority 1: `keywordTrackingId` - scan specific keyword by ID
+   - Priority 2: `keyword` + `topic` - find and scan specific keyword by text matching
+   - Priority 3: No parameters - scan ALL keywords (legacy behavior)
+3. **Frontend parameter consistency**: Updated both scan calls to send `keyword` and `topic` parameters
+
+**Files Modified:**
+- `app/api/mentions/scan/route.ts` - Enhanced scanning logic with priority-based keyword selection
+- `app/dashboard/page.tsx` - Fixed scan calls to include keyword and topic parameters
+
+**Code Changes:**
+```typescript
+// Backend: Enhanced scanning logic with priority system
+if (keywordTrackingId) {
+  // Priority 1: Scan by ID
+} else if (keyword && topic) {
+  // Priority 2: Find and scan by keyword+topic combination
+  const specificKeyword = brandTracking.keywordTracking.find(k => 
+    k.keyword.toLowerCase() === keyword.toLowerCase() && 
+    k.topic.toLowerCase() === topic.toLowerCase()
+  )
+} else {
+  // Priority 3: Scan all keywords (legacy)
+}
+
+// Frontend: Consistent parameter sending
+body: JSON.stringify({ 
+  brandTrackingId: project.id,
+  keyword: trackingItem.keyword, // Send specific keyword
+  topic: trackingItem.topic,     // Send specific topic
+  immediate: true 
+})
+```
+
+**Testing Verification:**
+1. ✅ Keywords now scanned only once per request
+2. ✅ No more scanning loops or duplicate scans
+3. ✅ Specific keyword scanning works by keyword+topic matching
+4. ✅ Backward compatibility maintained for existing functionality
+
+**Prevention Strategy:**
+- **ALWAYS** specify which keywords to scan in scan requests
+- **IMPLEMENT** priority-based parameter handling in APIs
+- **VALIDATE** frontend sends consistent parameters
+- **LOG** scan requests to detect duplicate calls
+
+---
+
+## Issue #031: Missing Individual Topic Refresh Functionality
+**Status**: 🟢 **RESOLVED**  
+**Priority**: MEDIUM  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+Users requested the ability to refresh individual topics without scanning all keywords. Currently, the system only provides a global "Run Scan" button that scans all keywords across all projects, which is inefficient for testing specific topics.
+
+**User Request:**
+"Please if you can make refresh icon to each topic inside the keyword next to the x button where you remove the keyword. On click it checks only this keyword and the button circle around when its testing"
+
+**Root Causes:**
+1. **Missing individual topic scanning**: No way to scan a single topic without affecting others
+2. **Global scan only**: System designed for batch scanning of all keywords
+3. **No visual feedback**: Users can't see which specific topic is being scanned
+4. **Inefficient workflow**: Must scan entire project to test one topic
+
+**Resolution:**
+1. **Added individual refresh button**: Blue refresh icon button next to each topic's X button
+2. **Single topic scanning**: Uses existing scan API with `keyword` and `topic` parameters
+3. **Visual feedback**: Button shows spinning animation while scanning
+4. **State management**: Tracks which topics are currently being refreshed
+5. **Efficient scanning**: Only scans the specific keyword-topic combination requested
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Added refresh button and single topic scanning functionality
+
+**Code Changes:**
+```typescript
+// Added refresh state tracking
+const [refreshingTopics, setRefreshingTopics] = useState<Set<string>>(new Set())
+
+// Added single topic refresh function
+const refreshSingleTopic = async (projectId: string, topic: any) => {
+  const topicKey = `${projectId}-${topic.keyword}-${topic.topic}`
+  setRefreshingTopics(prev => new Set(prev).add(topicKey))
+  
+  // Call scan API for specific topic only
+  const scanResponse = await fetch('/api/mentions/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      brandTrackingId: project.id,
+      keyword: topic.keyword,
+      topic: topic.topic,
+      immediate: true 
+    })
+  })
+  
+  // Handle response and cleanup
+}
+
+// Added refresh button in UI
+<Button 
+  variant="ghost" 
+  size="sm"
+  onClick={() => refreshSingleTopic(projectId, topic)}
+  disabled={refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`)}
+  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+>
+  <RefreshCw className={`w-4 h-4 ${refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ? 'animate-spin' : ''}`} />
+</Button>
+```
+
+**Testing Verification:**
+1. ✅ Refresh button appears next to each topic's X button
+2. ✅ Button shows spinning animation while scanning
+3. ✅ Only scans the specific topic requested
+4. ✅ Button is disabled during scanning to prevent duplicate requests
+5. ✅ Success/error feedback via toast notifications
+6. ✅ Projects data refreshes to show updated results
+
+**User Experience Improvements:**
+- **Efficient testing**: Test individual topics without full project scans
+- **Visual feedback**: Clear indication of which topic is being processed
+- **Better workflow**: Targeted scanning for specific keyword-topic combinations
+- **Consistent UI**: Refresh button follows same design pattern as other buttons
+
+**Prevention Strategy:**
+- **ALWAYS** provide individual controls for batch operations
+- **IMPLEMENT** visual feedback for long-running operations
+- **DESIGN** efficient workflows that don't require full system scans
+- **TEST** user workflows to identify efficiency bottlenecks
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*

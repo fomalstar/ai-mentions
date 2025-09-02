@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to find user in database' }, { status: 500 })
     }
 
-    const { brandTrackingId, keywordTrackingId, immediate = false } = await request.json()
-    console.log(`📋 Request data:`, { brandTrackingId, keywordTrackingId, immediate })
+    const { brandTrackingId, keywordTrackingId, keyword, topic, immediate = false } = await request.json()
+    console.log(`📋 Request data:`, { brandTrackingId, keywordTrackingId, keyword, topic, immediate })
     
     if (!brandTrackingId) {
       console.log('❌ No brandTrackingId provided')
@@ -190,14 +190,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (immediate) {
-      // Start immediate scan - ONLY scan the specific keyword if keywordTrackingId is provided
+      // Start immediate scan - scan specific keyword by ID, keyword+topic, or all keywords
       const results = []
       
-      // If keywordTrackingId is provided, only scan that specific keyword
+      // Priority 1: If keywordTrackingId is provided, scan that specific keyword
       if (keywordTrackingId) {
         const specificKeyword = brandTracking.keywordTracking.find(k => k.id === keywordTrackingId)
         if (specificKeyword) {
-          console.log(`🎯 Scanning specific keyword: ${specificKeyword.keyword}`)
+          console.log(`🎯 Scanning specific keyword by ID: ${specificKeyword.keyword}`)
           const result = await scanSingleKeyword(specificKeyword, brandTracking, dbUser)
           results.push(result)
         } else {
@@ -206,8 +206,26 @@ export async function POST(request: NextRequest) {
             details: `Keyword with ID ${keywordTrackingId} not found in brand tracking`
           }, { status: 404 })
         }
-      } else {
-        // If no specific keyword requested, scan ALL keywords (legacy behavior)
+      }
+      // Priority 2: If keyword and topic are provided, find and scan that specific keyword
+      else if (keyword && topic) {
+        const specificKeyword = brandTracking.keywordTracking.find(k => 
+          k.keyword.toLowerCase() === keyword.toLowerCase() && 
+          k.topic.toLowerCase() === topic.toLowerCase()
+        )
+        if (specificKeyword) {
+          console.log(`🎯 Scanning specific keyword by keyword+topic: ${specificKeyword.keyword} - ${specificKeyword.topic}`)
+          const result = await scanSingleKeyword(specificKeyword, brandTracking, dbUser)
+          results.push(result)
+        } else {
+          return NextResponse.json({ 
+            error: 'Keyword and topic combination not found',
+            details: `No keyword found with keyword: "${keyword}" and topic: "${topic}"`
+          }, { status: 404 })
+        }
+      }
+      // Priority 3: If no specific parameters, scan ALL keywords (legacy behavior)
+      else {
         console.log(`⚠️ No specific keyword requested - scanning ALL ${brandTracking.keywordTracking.length} keywords`)
         for (const keyword of brandTracking.keywordTracking) {
           const result = await scanSingleKeyword(keyword, brandTracking, dbUser)
@@ -228,9 +246,23 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Schedule scan in queue
-      const keywords = keywordTrackingId 
-        ? brandTracking.keywordTracking.filter(k => k.id === keywordTrackingId)
-        : brandTracking.keywordTracking
+      let keywords = []
+      
+      // Priority 1: If keywordTrackingId is provided, schedule that specific keyword
+      if (keywordTrackingId) {
+        keywords = brandTracking.keywordTracking.filter(k => k.id === keywordTrackingId)
+      }
+      // Priority 2: If keyword and topic are provided, find and schedule that specific keyword
+      else if (keyword && topic) {
+        keywords = brandTracking.keywordTracking.filter(k => 
+          k.keyword.toLowerCase() === keyword.toLowerCase() && 
+          k.topic.toLowerCase() === topic.toLowerCase()
+        )
+      }
+      // Priority 3: If no specific parameters, schedule ALL keywords
+      else {
+        keywords = brandTracking.keywordTracking
+      }
 
       const queueItems = []
       

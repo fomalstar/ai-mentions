@@ -60,12 +60,13 @@
 - **Manual Mention Addition**: Add mentions manually with full CRUD support
 - **Project Management**: Edit, delete, and manage projects with brand names
 
-### 🔄 **NEW: Advanced Position Tracking (25% Complete)**
+### 🔄 **NEW: Advanced Position Tracking (30% Complete)**
 - ✅ **Enhanced Database Schema**: New models for position tracking and AI scanning
 - 🔄 **Position Metrics**: Avg. Position, Change tracking, platform-specific rankings
 - 🔄 **AI Scanning Service**: Real-time scanning of ChatGPT, Perplexity, Gemini
 - 🔄 **Source URL Extraction**: Extract and store source URLs from AI responses
 - 🔄 **Data Sources Section**: Display clickable source URLs with dates
+- ✅ **Individual Topic Refresh**: Refresh button for each topic with spinning animation
 - 🔄 **Scanning Controls**: Red "Run Scan" button, Stop scanning, status indicators
 - 🔄 **24-Hour Automation**: Automated scanning with user controls
 
@@ -77,6 +78,8 @@
 - ✅ **Generic List Filtering**: Enhanced to preserve relevant brand mentions
 - ✅ **Frontend-Backend Sync**: Proper state management after database changes
 - ✅ **Topic Removal API Fix**: Resolved 404 errors by fixing parameter mismatch between frontend and backend
+- ✅ **Scanning Loop Fix**: Resolved infinite scanning loop by implementing priority-based keyword selection
+- ✅ **Individual Topic Refresh**: Added refresh button for each topic with spinning animation and single-topic scanning
 
 ### ✅ **SaaS Dashboard Experience (100% Complete)**
 - **Project Management System**: Create and manage multiple projects/websites
