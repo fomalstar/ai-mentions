@@ -1114,5 +1114,197 @@ const keywordRecord = await prisma.keywordTracking.findFirst({
 
 ---
 
+---
+
+## Issue #025: AI Query Bias Causing False Brand Mentions
+**Status**: 🟢 RESOLVED  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+AI models were explicitly told to focus on specific brands in their research queries, leading to biased results and false positive brand mentions. For example, when researching "how to make money", the AI would be instructed to "include specific details about Yandex if mentioned", causing artificial brand detection.
+
+**Error Details:**
+- Brand "Yandex" showing up in unrelated topics like "how to make money"
+- AI responses artificially biased toward brand mentions
+- False position rankings due to forced brand inclusion
+
+**Root Cause:**
+The AI query prompts explicitly mentioned the brand name and instructed the AI to focus on it:
+```typescript
+content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+```
+
+**Resolution:**
+Removed brand bias from all AI queries. AI now researches topics independently, and brand analysis happens separately after receiving unbiased responses.
+
+**Files Modified:**
+- `lib/ai-scanning.ts` - Updated all AI query prompts to remove brand bias
+
+**Code Change:**
+```typescript
+// Before (biased):
+content: `Analyze the topic "${request.topic}" and provide a comprehensive response. Focus on current information and include specific details about "${request.brandName}" if mentioned.`
+
+// After (unbiased):
+content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+```
+
+**Testing Verification:**
+1. AI now researches topics independently without brand bias
+2. Brand mentions are detected naturally from unbiased responses
+3. More accurate brand detection results
+
+**Prevention Strategy:**
+- **NEVER** mention brands in AI research queries
+- **ALWAYS** analyze brand mentions separately from AI responses
+- **TEST** with various topics to ensure unbiased research
+
+---
+
+## Issue #026: Overly Aggressive Generic List Filtering
+**Status**: 🟢 RESOLVED  
+**Priority**: MEDIUM  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+The `isGenericListMention` method was too aggressive, blocking ALL brand mentions in generic lists even when the topic was specifically about that category. For example, when researching "what is the name of the russian search engine" with brand "Yandex", it would block the mention because Yandex appeared in a search engine list.
+
+**Error Details:**
+- Topic: "what is the name of the russian search engine"
+- Brand: "Yandex"
+- Result: "No mentions found" (incorrect)
+- Root Cause: Yandex blocked as generic list mention
+
+**Root Cause:**
+The filtering logic didn't consider whether the topic was actually about the brand's category. It blocked all mentions in generic lists regardless of topic relevance.
+
+**Resolution:**
+Enhanced the filtering logic to be context-aware. If the topic is about the brand's category (e.g., "search engines"), then brand mentions in that category ARE relevant.
+
+**Files Modified:**
+- `lib/ai-scanning.ts` - Enhanced `isGenericListMention` method with topic analysis
+
+**Code Change:**
+```typescript
+// Added topic relevance checking:
+const topicKeywords = {
+  'search engines': ['search engine', 'search engines', 'search tool', 'search tools', 'browser search', 'web search'],
+  'social media': ['social media', 'social platform', 'social platforms', 'social network', 'social networks'],
+  'tech companies': ['tech company', 'tech companies', 'technology company', 'technology companies', 'software company'],
+  'browsers': ['browser', 'browsers', 'web browser', 'web browsers', 'internet browser']
+}
+
+// Check if topic is about the brand's category
+for (const [category, keywords] of Object.entries(topicKeywords)) {
+  if (keywords.some(keyword => text.includes(keyword))) {
+    // Topic is about this category, so brand mentions ARE relevant
+    return false
+  }
+}
+```
+
+**Testing Verification:**
+1. "Russian search engine" + "Yandex" now correctly finds mentions
+2. Generic list filtering still works for unrelated topics
+3. Context-aware brand detection
+
+**Prevention Strategy:**
+- **ALWAYS** consider topic context when filtering brand mentions
+- **TEST** with category-specific topics to ensure proper filtering
+- **BALANCE** between filtering noise and preserving relevant mentions
+
+---
+
+## Issue #027: Excessive URL Extraction in Data Sources
+**Status**: 🟢 RESOLVED  
+**Priority**: LOW  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+Data sources were showing too many URLs per AI platform, making the results cluttered and difficult to navigate. Users wanted a more focused view of the most relevant sources.
+
+**Error Details:**
+- 10+ URLs per AI platform
+- Cluttered data source display
+- Difficult to identify most relevant sources
+
+**Resolution:**
+Limited URL extraction to the top 2 most relevant URLs per AI platform.
+
+**Files Modified:**
+- `lib/ai-scanning.ts` - Added URL limiting in `extractUrlsFromText` method
+
+**Code Change:**
+```typescript
+// Limit to top 2 most relevant URLs per AI
+const limitedUrls = urls.slice(0, 2)
+if (urls.length > 2) {
+  console.log(`📝 Limiting URLs from ${urls.length} to top 2 most relevant`)
+}
+return limitedUrls
+```
+
+**Testing Verification:**
+1. Maximum 2 URLs per AI platform
+2. Cleaner, more focused data sources
+3. Easier navigation and analysis
+
+**Prevention Strategy:**
+- **LIMIT** URL results to maintain focus
+- **PRIORITIZE** most relevant sources
+- **CONSIDER** user experience when displaying data
+
+---
+
+## Issue #028: Frontend State Desynchronization After Keyword Removal
+**Status**: 🟢 RESOLVED  
+**Priority**: MEDIUM  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+After removing keywords from the database, the frontend state would become desynchronized, showing "ghost" keywords that couldn't be removed because they no longer existed in the database.
+
+**Error Details:**
+- Keywords visible in UI but not removable
+- X button appears but doesn't work
+- Frontend and database state out of sync
+
+**Root Causes:**
+1. Incorrect localStorage filtering (filtering by `topic` instead of `keyword + topic`)
+2. Frontend state not refreshing after database changes
+3. Mismatch between localStorage structure and filtering logic
+
+**Resolution:**
+1. Fixed localStorage filtering to properly remove items by `projectId + keyword + topic`
+2. Added automatic refresh of projects data after keyword removal
+3. Removed problematic code accessing non-existent properties
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Fixed `removeTopicFromTracking` function
+
+**Code Change:**
+```typescript
+// Fixed localStorage filtering:
+const updatedTracking = existingTracking.filter((item: any) => 
+  !(item.projectId === projectId && item.keyword === topic.keyword && item.topic === topic.topic)
+)
+
+// Added automatic refresh:
+await loadProjectsFromDatabase()
+```
+
+**Testing Verification:**
+1. X button correctly removes keywords
+2. Frontend state stays synchronized with database
+3. No more "ghost" keywords that can't be removed
+
+**Prevention Strategy:**
+- **ALWAYS** refresh frontend state after database changes
+- **USE** consistent filtering criteria across localStorage and database
+- **TEST** state synchronization after CRUD operations
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*

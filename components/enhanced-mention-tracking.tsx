@@ -62,6 +62,10 @@ export function EnhancedMentionTracking() {
   const [scanProgress, setScanProgress] = useState(0)
   const [showAddBrand, setShowAddBrand] = useState(false)
   const [newBrand, setNewBrand] = useState({ name: '', website: '', keywords: '' })
+  const [sourcesPage, setSourcesPage] = useState(1)
+  const [sourcesPageSize] = useState(10)
+  const [showUrlsModal, setShowUrlsModal] = useState(false)
+  const [selectedKeywordForUrls, setSelectedKeywordForUrls] = useState<{ brandId?: string, keyword: string, topic?: string } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -82,6 +86,7 @@ export function EnhancedMentionTracking() {
       if (sourcesResponse.ok) {
         const sourcesData = await sourcesResponse.json()
         setDataSources(sourcesData.sources || [])
+        setSourcesPage(1)
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -260,6 +265,14 @@ export function EnhancedMentionTracking() {
     return <Minus className="w-4 h-4 text-muted-foreground" />
   }
 
+  const openUrlsForKeyword = (keyword: string, topic?: string) => {
+    setSelectedKeywordForUrls({ keyword, topic })
+    setShowUrlsModal(true)
+  }
+
+  const totalSourcesPages = Math.max(1, Math.ceil(dataSources.length / sourcesPageSize))
+  const pagedSources = dataSources.slice((sourcesPage - 1) * sourcesPageSize, sourcesPage * sourcesPageSize)
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -437,6 +450,7 @@ export function EnhancedMentionTracking() {
                         <TableHead>Change</TableHead>
                         <TableHead>Last Scan</TableHead>
                         <TableHead>Scan Count</TableHead>
+                        <TableHead>Sources</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -453,6 +467,15 @@ export function EnhancedMentionTracking() {
                             {keyword.lastScanAt ? new Date(keyword.lastScanAt).toLocaleDateString() : '-'}
                           </TableCell>
                           <TableCell>{keyword.scanCount}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openUrlsForKeyword(keyword.keyword, keyword.topic)}
+                            >
+                              <ExternalLink className="w-4 h-4 mr-1" /> URLs
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -500,7 +523,8 @@ export function EnhancedMentionTracking() {
             <CardContent>
               {dataSources.length > 0 ? (
                 <div className="space-y-4">
-                  {dataSources.map((source) => (
+                  <div className="max-h-96 overflow-y-auto pr-1">
+                  {pagedSources.map((source) => (
                     <div key={source.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
@@ -541,6 +565,31 @@ export function EnhancedMentionTracking() {
                       </div>
                     </div>
                   ))}
+                  </div>
+                  {/* Pagination Controls */}
+                  {totalSourcesPages > 1 && (
+                    <div className="flex items-center justify-between pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSourcesPage(p => Math.max(1, p - 1))}
+                        disabled={sourcesPage === 1}
+                      >
+                        Prev
+                      </Button>
+                      <div className="text-sm text-muted-foreground">
+                        Page {sourcesPage} of {totalSourcesPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSourcesPage(p => Math.min(totalSourcesPages, p + 1))}
+                        disabled={sourcesPage === totalSourcesPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -553,6 +602,41 @@ export function EnhancedMentionTracking() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* URLs Modal for a specific keyword/topic */}
+      <Dialog open={showUrlsModal} onOpenChange={setShowUrlsModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Source URLs for {selectedKeywordForUrls?.keyword}</DialogTitle>
+            <DialogDescription>
+              All URLs collected across AI platforms for this topic's research.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+            {(() => {
+              if (!selectedKeywordForUrls) return null
+              const urls = dataSources
+                .filter(s => s.keyword === selectedKeywordForUrls.keyword)
+                .flatMap(s => s.urls.map(u => ({ ...u, platform: s.platform, date: s.scanDate })))
+              const unique = Array.from(new Map(urls.map(u => [u.url, u])).values())
+              if (unique.length === 0) {
+                return <div className="text-sm text-muted-foreground">No URLs found for this keyword yet.</div>
+              }
+              return unique.map((u, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
+                  <div>
+                    <div className="font-medium text-sm">{u.domain}</div>
+                    <div className="text-xs text-muted-foreground truncate max-w-md">{u.title}</div>
+                  </div>
+                    <Button variant="ghost" size="sm" onClick={() => window.open(u.url, '_blank')}>
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                </div>
+              ))
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

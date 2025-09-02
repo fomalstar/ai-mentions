@@ -2,9 +2,9 @@
 
 ## Current Status: 🔄 Enhanced Mention Tracking System Development
 
-**Last Updated**: January 2025  
-**Version**: 4.0.0  
-**Phase**: Enhanced Mention Tracking with AI Position Ranking & Source Detection
+**Last Updated**: January 31, 2025  
+**Version**: 4.1.0  
+**Phase**: Enhanced Mention Tracking with AI Position Ranking & Source Detection + Critical Bug Fixes
 
 ---
 
@@ -68,6 +68,14 @@
 - 🔄 **Data Sources Section**: Display clickable source URLs with dates
 - 🔄 **Scanning Controls**: Red "Run Scan" button, Stop scanning, status indicators
 - 🔄 **24-Hour Automation**: Automated scanning with user controls
+
+### ✅ **Recent Critical Fixes (100% Complete)**
+- ✅ **AI Query Bias Removal**: Eliminated brand bias from AI research queries
+- ✅ **Smart Brand Detection**: Context-aware filtering prevents false positives
+- ✅ **URL Limiting**: Limited to top 2 URLs per AI platform for cleaner results
+- ✅ **Keyword Removal Fix**: Fixed frontend state synchronization issues
+- ✅ **Generic List Filtering**: Enhanced to preserve relevant brand mentions
+- ✅ **Frontend-Backend Sync**: Proper state management after database changes
 
 ### ✅ **SaaS Dashboard Experience (100% Complete)**
 - **Project Management System**: Create and manage multiple projects/websites

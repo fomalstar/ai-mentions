@@ -112,9 +112,13 @@ export default function Dashboard() {
   const [isProjectSelectionModalOpen, setIsProjectSelectionModalOpen] = useState(false)
   const [selectedTopicData, setSelectedTopicData] = useState<{keyword: string, topic: string} | null>(null)
   const [mentionResults, setMentionResults] = useState<any[]>([])
+  const [mentionsPage, setMentionsPage] = useState(1)
+  const [mentionsPageSize] = useState(10)
   const [isTracking, setIsTracking] = useState(false)
   const [scanningProjects, setScanningProjects] = useState<Set<string>>(new Set())
   const [dataSources, setDataSources] = useState<any[]>([])
+  const [dataSourcesPage, setDataSourcesPage] = useState(1)
+  const [dataSourcesPageSize] = useState(10)
   const [lastScheduledCheck, setLastScheduledCheck] = useState<string | null>(null)
   const [isAddMentionModalOpen, setIsAddMentionModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -176,6 +180,7 @@ export default function Dashboard() {
         )
         
         setDataSources(transformedSources)
+        setDataSourcesPage(1)
         console.log(`📊 Transformed ${transformedSources.length} source URLs for display`)
       } else {
         console.log('📭 No data sources available yet')
@@ -2491,9 +2496,11 @@ export default function Dashboard() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-80 overflow-y-auto">
+                    <div className="space-y-4">
+                      <div className="max-h-80 overflow-y-auto">
                       {mentionResults
                         .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
+                        .slice((mentionsPage - 1) * mentionsPageSize, mentionsPage * mentionsPageSize)
                         .map((result) => (
                           <div key={result.id} className="flex items-start gap-4 p-4 rounded-lg border">
                             <div className="text-2xl">
@@ -2536,6 +2543,31 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                      {/* Pagination Controls */}
+                      {Math.ceil(mentionResults.length / mentionsPageSize) > 1 && (
+                        <div className="flex items-center justify-between">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMentionsPage(p => Math.max(1, p - 1))}
+                            disabled={mentionsPage === 1}
+                          >
+                            Prev
+                          </Button>
+                          <div className="text-sm text-muted-foreground">
+                            Page {mentionsPage} of {Math.ceil(mentionResults.length / mentionsPageSize)}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMentionsPage(p => Math.min(Math.ceil(mentionResults.length / mentionsPageSize), p + 1))}
+                            disabled={mentionsPage === Math.ceil(mentionResults.length / mentionsPageSize)}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -2567,7 +2599,10 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {dataSources.map((source, index) => (
+                    <div className="max-h-80 overflow-y-auto">
+                    {dataSources
+                      .slice((dataSourcesPage - 1) * dataSourcesPageSize, dataSourcesPage * dataSourcesPageSize)
+                      .map((source, index) => (
                       <div key={source.id || index} className="flex items-start gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center justify-between">
@@ -2602,6 +2637,30 @@ export default function Dashboard() {
                         </div>
                       </div>
                     ))}
+                    </div>
+                    {Math.ceil(dataSources.length / dataSourcesPageSize) > 1 && (
+                      <div className="flex items-center justify-between pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDataSourcesPage(p => Math.max(1, p - 1))}
+                          disabled={dataSourcesPage === 1}
+                        >
+                          Prev
+                        </Button>
+                        <div className="text-sm text-muted-foreground">
+                          Page {dataSourcesPage} of {Math.ceil(dataSources.length / dataSourcesPageSize)}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDataSourcesPage(p => Math.min(Math.ceil(dataSources.length / dataSourcesPageSize), p + 1))}
+                          disabled={dataSourcesPage === Math.ceil(dataSources.length / dataSourcesPageSize)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
