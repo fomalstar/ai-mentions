@@ -215,12 +215,13 @@ export async function DELETE(request: NextRequest) {
     if (keywordId && keyword) {
       // Delete specific keyword from keywordTracking
       console.log(`🗑️ Deleting keyword: ${keyword} from keyword tracking`)
+      console.log(`🔍 Search params: keywordId=${keywordId}, keyword=${keyword}, userId=${dbUser.id}`)
       
       try {
-        // First verify the keyword belongs to a brand tracking record owned by this user
+        // Find the keyword by text and user ID, since frontend sends timestamp IDs that don't exist in database
         const keywordRecord = await prisma.keywordTracking.findFirst({
           where: {
-            id: keywordId,
+            keyword: keyword.toLowerCase(),
             userId: dbUser.id
           },
           include: {
@@ -229,13 +230,18 @@ export async function DELETE(request: NextRequest) {
         })
 
         if (!keywordRecord) {
+          console.log(`❌ Keyword not found: ${keyword} for user: ${dbUser.id}`)
+          console.log(`🔍 Available keywords for user:`, await prisma.keywordTracking.findMany({
+            where: { userId: dbUser.id },
+            select: { id: true, keyword: true, brandTrackingId: true }
+          }))
           return NextResponse.json({ error: 'Keyword not found or access denied' }, { status: 404 })
         }
 
-        // Delete the keyword
+        // Delete the keyword using the found record's ID
         await prisma.keywordTracking.delete({
           where: {
-            id: keywordId,
+            id: keywordRecord.id,
             userId: dbUser.id
           }
         })

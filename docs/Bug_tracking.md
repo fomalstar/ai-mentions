@@ -1059,5 +1059,60 @@ const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=
 
 ---
 
+## Issue #024: Frontend-Database ID Mismatch in Keyword Deletion
+**Status**: 🟢 RESOLVED  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+Even after fixing URL encoding, keyword deletion still fails with 404 errors. The issue is that the frontend sends timestamp-based IDs that don't exist in the database.
+
+**Error Details:**
+```
+Failed to load resource: the server responded with a status of 404 ()
+api/mentions/track?keywordId=1756753899159&keyword=yandex:1
+```
+
+**Root Cause:**
+The frontend creates topics with `id: Date.now().toString()` (timestamp-based IDs like `1756753899159`), but the backend `keywordTracking` table uses cuid-based IDs (like `cmf1hbux30001iu3c0c636n5c`). When trying to delete a keyword, the backend looks for a record with the timestamp ID, which doesn't exist in the database.
+
+**Resolution:**
+Modified the DELETE endpoint to find keywords by text content and user ID instead of trying to match by the non-existent timestamp ID.
+
+**Files Modified:**
+- `app/api/mentions/track/route.ts` - Updated DELETE logic to find keywords by text instead of ID
+
+**Code Change:**
+```typescript
+// Before (causing 404 errors):
+const keywordRecord = await prisma.keywordTracking.findFirst({
+  where: {
+    id: keywordId,  // This ID doesn't exist in database
+    userId: dbUser.id
+  }
+})
+
+// After (fixed):
+const keywordRecord = await prisma.keywordTracking.findFirst({
+  where: {
+    keyword: keyword.toLowerCase(),  // Find by actual keyword text
+    userId: dbUser.id
+  }
+})
+```
+
+**Testing Verification:**
+1. Keywords can now be deleted using their text content
+2. No more 404 errors due to ID mismatches
+3. Proper user authorization still enforced
+
+**Prevention Strategy:**
+- **NEVER** use frontend-generated IDs for database operations
+- **ALWAYS** use database-generated IDs (cuid) for API calls
+- **CONSIDER** refactoring frontend to use database IDs instead of timestamp IDs
+- **TEST** ID synchronization between frontend and backend
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*
