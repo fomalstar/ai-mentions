@@ -140,6 +140,8 @@ export default function Dashboard() {
     loadMentionResults()
     // Load data sources
     fetchDataSources()
+    // Also clean up any orphaned localStorage items on component mount
+    cleanupOrphanedLocalStorageItems()
   }, [])
 
   const fetchDataSources = async () => {
@@ -1354,7 +1356,8 @@ export default function Dashboard() {
   const removeTopicFromTracking = async (projectId: string, topic: any) => {
     try {
       // Call the API to delete the keyword from database
-      const response = await fetch(`/api/mentions/track?keywordId=${topic.id}&keyword=${encodeURIComponent(topic.keyword)}`, {
+      // Use keyword text and topic text instead of potentially non-existent topic.id
+      const response = await fetch(`/api/mentions/track?keyword=${encodeURIComponent(topic.keyword)}&topic=${encodeURIComponent(topic.topic)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -1376,8 +1379,11 @@ export default function Dashboard() {
         
         toast.success('Topic removed from tracking and database')
         
-        // Force refresh of projects data to ensure UI is in sync
+              // Force refresh of projects data to ensure UI is in sync
         await loadProjectsFromDatabase()
+        
+        // Also clean up any orphaned localStorage items
+        await cleanupOrphanedLocalStorageItems()
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to remove topic from database')
@@ -1385,6 +1391,45 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Remove topic error:', error)
       toast.error('Failed to remove topic')
+    }
+  }
+
+  // Clean up orphaned localStorage items that don't exist in database
+  const cleanupOrphanedLocalStorageItems = async () => {
+    try {
+      const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+      if (existingTracking.length === 0) return
+      
+      // Get current database state
+      const response = await fetch('/api/mentions/status')
+      if (!response.ok) return
+      
+      const data = await response.json()
+      const dbKeywords = new Set()
+      
+      // Build set of valid keyword-topic combinations from database
+      if (data.brandTracking) {
+        data.brandTracking.forEach((brand: any) => {
+          if (brand.keywordTracking) {
+            brand.keywordTracking.forEach((kt: any) => {
+              dbKeywords.add(`${brand.id}:${kt.keyword}:${kt.topic}`)
+            })
+          }
+        })
+      }
+      
+      // Remove localStorage items that don't exist in database
+      const validTracking = existingTracking.filter((item: any) => {
+        const key = `${item.projectId}:${item.keyword}:${item.topic}`
+        return dbKeywords.has(key)
+      })
+      
+      if (validTracking.length !== existingTracking.length) {
+        localStorage.setItem('mentionTracking', JSON.stringify(validTracking))
+        console.log(`🧹 Cleaned up ${existingTracking.length - validTracking.length} orphaned localStorage items`)
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error)
     }
   }
 
@@ -2342,15 +2387,7 @@ export default function Dashboard() {
                                                 <Badge variant="outline" className="text-xs">
                                                   {hasMentions ? `${analytics.totalMentions} mentions` : 'Monitoring'}
                                                 </Badge>
-                                                <Button 
-                                                  variant="ghost" 
-                                                  size="sm"
-                                                  onClick={() => toggleTopicExpansion(topicId)}
-                                                >
-                                                  <ChevronRight 
-                                                    className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
-                                                  />
-                                                </Button>
+                                                {/* Removed expand toggle button per request */}
                                                 <Button 
                                                   variant="ghost" 
                                                   size="sm"

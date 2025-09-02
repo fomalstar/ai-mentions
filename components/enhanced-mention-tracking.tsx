@@ -270,6 +270,39 @@ export function EnhancedMentionTracking() {
     setShowUrlsModal(true)
   }
 
+  const setKeywordScanningState = (brandId: string, keywordId: string, scanning: boolean) => {
+    setBrands(prev => prev.map(b => {
+      if (b.id !== brandId) return b
+      return {
+        ...b,
+        keywords: b.keywords.map(k => k.id === keywordId ? { ...k, isScanning: scanning } : k)
+      }
+    }))
+  }
+
+  const startScanSingle = async (brandId: string, keywordId: string) => {
+    try {
+      setKeywordScanningState(brandId, keywordId, true)
+      const response = await fetch('/api/mentions/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandTrackingId: brandId, keywordTrackingId: keywordId, immediate: true })
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        toast.error(err.error || 'Failed to scan this topic')
+        return
+      }
+      toast.success('Scan completed for this topic')
+      await loadData()
+    } catch (e) {
+      console.error('Single scan error:', e)
+      toast.error('Failed to scan this topic')
+    } finally {
+      setKeywordScanningState(brandId, keywordId, false)
+    }
+  }
+
   const totalSourcesPages = Math.max(1, Math.ceil(dataSources.length / sourcesPageSize))
   const pagedSources = dataSources.slice((sourcesPage - 1) * sourcesPageSize, sourcesPage * sourcesPageSize)
 
@@ -451,6 +484,7 @@ export function EnhancedMentionTracking() {
                         <TableHead>Last Scan</TableHead>
                         <TableHead>Scan Count</TableHead>
                         <TableHead>Sources</TableHead>
+                        <TableHead className="w-32">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -474,6 +508,21 @@ export function EnhancedMentionTracking() {
                               onClick={() => openUrlsForKeyword(keyword.keyword, keyword.topic)}
                             >
                               <ExternalLink className="w-4 h-4 mr-1" /> URLs
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => startScanSingle(brand.id, keyword.id)}
+                              disabled={!!keyword.isScanning}
+                            >
+                              {keyword.isScanning ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4 mr-1" />
+                              )}
+                              {keyword.isScanning ? 'Scanning' : 'Refresh'}
                             </Button>
                           </TableCell>
                         </TableRow>

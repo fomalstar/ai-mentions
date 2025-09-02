@@ -1306,5 +1306,66 @@ await loadProjectsFromDatabase()
 
 ---
 
+## Issue #029: Topic Removal API Parameter Mismatch
+**Status**: 🟢 RESOLVED  
+**Priority**: HIGH  
+**Date Identified**: 2025-01-31  
+
+**Description:**
+The Dashboard's topic removal function was trying to use `topic.id` which didn't exist, causing 404 errors when trying to remove topics. The frontend was sending parameters that the backend couldn't process.
+
+**Error Details:**
+- 404 errors on topic removal
+- Frontend using non-existent `topic.id` parameter
+- API expecting different parameter structure
+
+**Root Causes:**
+1. Frontend sending `topic.id` instead of `keyword` and `topic` text
+2. Backend DELETE endpoint only handling `keywordId + keyword` parameters
+3. Mismatch between frontend removal logic and backend API expectations
+
+**Resolution:**
+1. Updated frontend to send `keyword` and `topic` parameters instead of `topic.id`
+2. Enhanced backend DELETE endpoint to handle `keyword + topic` parameter combinations
+3. Added defensive cleanup mechanism to remove orphaned localStorage items
+4. Added automatic cleanup on component mount and after deletions
+
+**Files Modified:**
+- `app/dashboard/page.tsx` - Fixed `removeTopicFromTracking` function parameters
+- `app/api/mentions/track/route.ts` - Enhanced DELETE endpoint for topic-based deletion
+
+**Code Changes:**
+```typescript
+// Frontend: Use keyword and topic text instead of topic.id
+const response = await fetch(`/api/mentions/track?keyword=${encodeURIComponent(topic.keyword)}&topic=${encodeURIComponent(topic.topic)}`, {
+  method: 'DELETE'
+})
+
+// Backend: Handle keyword + topic combination deletion
+if (keyword && topic) {
+  const keywordRecord = await prisma.keywordTracking.findFirst({
+    where: {
+      keyword: keyword.toLowerCase(),
+      topic: topic.toLowerCase(),
+      userId: dbUser.id
+    }
+  })
+  // ... deletion logic
+}
+```
+
+**Testing Verification:**
+1. X button correctly removes topics from both frontend and database
+2. No more 404 errors on topic removal
+3. Automatic cleanup of orphaned localStorage items
+4. Frontend state stays synchronized with database
+
+**Prevention Strategy:**
+- **ALWAYS** use actual data values instead of potentially non-existent IDs
+- **SYNC** frontend and backend parameter expectations
+- **IMPLEMENT** defensive cleanup mechanisms for state management
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*

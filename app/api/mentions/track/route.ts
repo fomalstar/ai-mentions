@@ -197,6 +197,7 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
     const keywordId = searchParams.get('keywordId')
     const keyword = searchParams.get('keyword')
+    const topic = searchParams.get('topic')
 
     // Check if database is available
     let isDatabaseAvailable = false
@@ -212,8 +213,68 @@ export async function DELETE(request: NextRequest) {
       })
     }
 
-    if (keywordId && keyword) {
-      // Delete specific keyword from keywordTracking
+    if (keyword && topic) {
+      // Delete specific keyword-topic combination from keywordTracking
+      console.log(`🗑️ Deleting keyword-topic combination: ${keyword} - ${topic} from keyword tracking`)
+      console.log(`🔍 Search params: keyword=${keyword}, topic=${topic}, userId=${dbUser.id}`)
+      
+      try {
+        // Find the keyword-topic combination by text and user ID
+        const keywordRecord = await prisma.keywordTracking.findFirst({
+          where: {
+            keyword: keyword.toLowerCase(),
+            topic: topic.toLowerCase(),
+            userId: dbUser.id
+          },
+          include: {
+            brandTracking: true
+          }
+        })
+
+        if (!keywordRecord) {
+          console.log(`❌ Keyword-topic combination not found: ${keyword} - ${topic} for user: ${dbUser.id}`)
+          console.log(`🔍 Available keywords for user:`, await prisma.keywordTracking.findMany({
+            where: { userId: dbUser.id },
+            select: { id: true, keyword: true, topic: true, brandTrackingId: true }
+          }))
+          return NextResponse.json({ error: 'Keyword-topic combination not found or access denied' }, { status: 404 })
+        }
+
+        // Delete the keyword-topic combination using the found record's ID
+        await prisma.keywordTracking.delete({
+          where: {
+            id: keywordRecord.id,
+            userId: dbUser.id
+          }
+        })
+
+        // Update the brand tracking keywords array to remove this keyword
+        const updatedKeywords = keywordRecord.brandTracking.keywords.filter(k => k !== keyword)
+        await prisma.brandTracking.update({
+          where: {
+            id: keywordRecord.brandTrackingId,
+            userId: dbUser.id
+          },
+          data: {
+            keywords: updatedKeywords
+          }
+        })
+
+        console.log(`✅ Keyword-topic combination deleted successfully: ${keyword} - ${topic}`)
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Keyword-topic combination deleted successfully' 
+        })
+
+      } catch (deleteError) {
+        console.error('❌ Failed to delete keyword-topic combination:', deleteError)
+        return NextResponse.json({ 
+          error: 'Failed to delete keyword-topic combination',
+          details: deleteError instanceof Error ? deleteError.message : 'Unknown error'
+        }, { status: 500 })
+      }
+    } else if (keywordId && keyword) {
+      // Delete specific keyword from keywordTracking (legacy support)
       console.log(`🗑️ Deleting keyword: ${keyword} from keyword tracking`)
       console.log(`🔍 Search params: keywordId=${keywordId}, keyword=${keyword}, userId=${dbUser.id}`)
       
@@ -313,7 +374,7 @@ export async function DELETE(request: NextRequest) {
 
     } else {
       return NextResponse.json({ 
-        error: 'Either id (for entire project) or keywordId+keyword (for specific keyword) is required' 
+        error: 'Either id (for entire project), keyword+topic (for specific keyword-topic combination), or keywordId+keyword (for specific keyword) is required' 
       }, { status: 400 })
     }
 

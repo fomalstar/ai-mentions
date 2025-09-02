@@ -76,6 +76,7 @@
 - ✅ **Keyword Removal Fix**: Fixed frontend state synchronization issues
 - ✅ **Generic List Filtering**: Enhanced to preserve relevant brand mentions
 - ✅ **Frontend-Backend Sync**: Proper state management after database changes
+- ✅ **Topic Removal API Fix**: Resolved 404 errors by fixing parameter mismatch between frontend and backend
 
 ### ✅ **SaaS Dashboard Experience (100% Complete)**
 - **Project Management System**: Create and manage multiple projects/websites
