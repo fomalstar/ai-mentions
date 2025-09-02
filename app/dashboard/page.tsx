@@ -148,6 +148,8 @@ export default function Dashboard() {
     fetchDataSources()
     // Also clean up any orphaned localStorage items on component mount
     cleanupOrphanedLocalStorageItems()
+    // Clean up corrupted localStorage data
+    cleanupCorruptedLocalStorage()
   }, [])
   
   // Re-render when tracking data is updated from database
