@@ -805,7 +805,7 @@ export default function Dashboard() {
             description: tracking.description || '',
             createdAt: tracking.createdAt ? new Date(tracking.createdAt).toISOString() : new Date().toISOString(),
             status: tracking.isActive ? 'active' : 'paused',
-            keywordsTracked: tracking.keywordTracking?.length || 0,
+            keywordsTracked: tracking.keywords?.length || 0,
             mentionsFound: tracking.totalMentions || 0,
             lastActivity: tracking.updatedAt ? new Date(tracking.updatedAt).toISOString() : new Date().toISOString()
           }))
@@ -818,8 +818,8 @@ export default function Dashboard() {
           const dbKeywordTracking: any[] = []
           
           data.brandTracking.forEach((tracking: any) => {
-            if (tracking.keywordTracking && Array.isArray(tracking.keywordTracking)) {
-              tracking.keywordTracking.forEach((kw: any) => {
+            if (tracking.keywords && Array.isArray(tracking.keywords)) {
+              tracking.keywords.forEach((kw: any) => {
                 dbKeywordTracking.push({
                   id: kw.id,
                   projectId: tracking.id,
@@ -856,7 +856,7 @@ export default function Dashboard() {
           // Calculate stats from loaded projects
           const totalProjects = dbProjects.length
           const activeKeywords = data.brandTracking.reduce((sum: number, tracking: any) => 
-            sum + (tracking.keywordTracking?.length || 0), 0
+            sum + (tracking.keywords?.length || 0), 0
           )
           const totalMentions = dbProjects.reduce((sum, project) => sum + project.mentionsFound, 0)
           const thisMonthMentions = 0 // We'll calculate this later when we have time-based data
@@ -1516,8 +1516,8 @@ export default function Dashboard() {
       // Build set of valid keyword-topic combinations from database
       if (data.brandTracking) {
         data.brandTracking.forEach((brand: any) => {
-          if (brand.keywordTracking) {
-            brand.keywordTracking.forEach((kt: any) => {
+          if (brand.keywords) {
+            brand.keywords.forEach((kt: any) => {
               dbKeywords.add(`${brand.id}:${kt.keyword}:${kt.topic}`)
             })
           }
