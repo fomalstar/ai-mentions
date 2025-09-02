@@ -73,6 +73,73 @@ export async function GET(request: NextRequest) {
           }
         }
       })
+      
+      // DATA RECOVERY: If no keywords found but brand has keywords array, recreate them
+      for (const brand of brands) {
+        if (brand.keywordTracking.length === 0 && brand.keywords && brand.keywords.length > 0) {
+          console.log(`🔄 Recovering lost keywords for brand ${brand.displayName}:`, brand.keywords)
+          
+          try {
+            // Recreate keyword tracking entries from brand.keywords array
+            for (let i = 0; i < brand.keywords.length; i++) {
+              const keyword = brand.keywords[i]
+              const topic = brand.topics?.[i] || `Research about ${keyword}`
+              
+              await prisma.keywordTracking.upsert({
+                where: {
+                  brandTrackingId_keyword: {
+                    brandTrackingId: brand.id,
+                    keyword: keyword.toLowerCase()
+                  }
+                },
+                update: {
+                  topic: topic,
+                  isActive: true,
+                  updatedAt: new Date()
+                },
+                create: {
+                  userId: dbUser.id,
+                  brandTrackingId: brand.id,
+                  keyword: keyword.toLowerCase(),
+                  topic: topic,
+                  isActive: true
+                }
+              })
+            }
+            
+            // Refresh the brand data after recovery
+            const recoveredBrand = await prisma.brandTracking.findUnique({
+              where: { id: brand.id },
+              include: {
+                keywordTracking: {
+                  where: { isActive: true },
+                  select: {
+                    id: true,
+                    keyword: true,
+                    topic: true,
+                    avgPosition: true,
+                    chatgptPosition: true,
+                    perplexityPosition: true,
+                    geminiPosition: true,
+                    positionChange: true,
+                    lastScanAt: true,
+                    scanCount: true
+                  }
+                }
+              }
+            })
+            
+            if (recoveredBrand) {
+              brand.keywordTracking = recoveredBrand.keywordTracking
+              console.log(`✅ Recovered ${recoveredBrand.keywordTracking.length} keywords for ${brand.displayName}`)
+            }
+            
+          } catch (recoveryError) {
+            console.error(`❌ Failed to recover keywords for ${brand.displayName}:`, recoveryError)
+          }
+        }
+      }
+      
     } catch (brandsError) {
       console.warn('Brand tracking query failed, trying without scan results count:', brandsError instanceof Error ? brandsError.message : 'Unknown error')
       

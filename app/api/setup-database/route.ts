@@ -16,42 +16,26 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Setting up enhanced mention tracking database...')
 
-    // Try to create the missing tables by running Prisma commands
+    // SAFE: Only create missing tables without destroying existing data
     try {
-      const { execSync } = require('child_process')
+      console.log('🔄 Checking and creating missing tables safely...')
       
-      // Push the schema to create missing tables
-      console.log('📦 Pushing schema to database...')
-      execSync('npx prisma db push --accept-data-loss', { 
-        stdio: 'inherit',
-        env: { ...process.env }
-      })
+      // Check which tables exist and create only missing ones
+      const existingTables = await prisma.$queryRaw`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('scan_result', 'scan_queue')
+      `
       
-      // Generate Prisma client
-      console.log('🔧 Generating Prisma client...')
-      execSync('npx prisma generate', { 
-        stdio: 'inherit',
-        env: { ...process.env }
-      })
+      const existingTableNames = existingTables.map((t: any) => t.table_name)
+      console.log('📊 Existing tables:', existingTableNames)
       
-      console.log('✅ Database setup completed successfully!')
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Database setup completed successfully',
-        timestamp: new Date().toISOString()
-      })
-      
-    } catch (error) {
-      console.error('❌ Database setup failed:', error)
-      
-      // Fallback: try to create tables manually via SQL
-      try {
-        console.log('🔄 Attempting manual table creation...')
-        
-        // Create scan_result table if it doesn't exist
+      // Create scan_result table if it doesn't exist
+      if (!existingTableNames.includes('scan_result')) {
+        console.log('🔧 Creating scan_result table...')
         await prisma.$executeRaw`
-          CREATE TABLE IF NOT EXISTS scan_result (
+          CREATE TABLE scan_result (
             id TEXT PRIMARY KEY,
             "userId" TEXT NOT NULL,
             "brandTrackingId" TEXT NOT NULL,
@@ -68,10 +52,16 @@ export async function POST(request: NextRequest) {
             "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `
-        
-        // Create scan_queue table if it doesn't exist
+        console.log('✅ scan_result table created')
+      } else {
+        console.log('✅ scan_result table already exists')
+      }
+      
+      // Create scan_queue table if it doesn't exist
+      if (!existingTableNames.includes('scan_queue')) {
+        console.log('🔧 Creating scan_queue table...')
         await prisma.$executeRaw`
-          CREATE TABLE IF NOT EXISTS scan_queue (
+          CREATE TABLE scan_queue (
             id TEXT PRIMARY KEY,
             "userId" TEXT NOT NULL,
             "brandTrackingId" TEXT NOT NULL,
@@ -90,27 +80,27 @@ export async function POST(request: NextRequest) {
             "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `
-        
-        console.log('✅ Manual table creation completed!')
-        
-        return NextResponse.json({
-          success: true,
-          message: 'Database setup completed via manual table creation',
-          timestamp: new Date().toISOString()
-        })
-        
-      } catch (manualError) {
-        console.error('❌ Manual table creation also failed:', manualError)
-        
-        return NextResponse.json({
-          success: false,
-          error: 'Database setup failed',
-          details: {
-            prismaError: error.message,
-            manualError: manualError.message
-          }
-        }, { status: 500 })
+        console.log('✅ scan_queue table created')
+      } else {
+        console.log('✅ scan_queue table already exists')
       }
+      
+      console.log('✅ Database setup completed safely without data loss!')
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Database setup completed safely without data loss',
+        timestamp: new Date().toISOString()
+      })
+      
+    } catch (error) {
+      console.error('❌ Safe database setup failed:', error)
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Database setup failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 })
     }
     
   } catch (error) {

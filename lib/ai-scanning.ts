@@ -289,7 +289,9 @@ export class AIScanningService {
     try {
       console.log(`🔍 Querying Gemini with topic: "${request.topic}"`)
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      // Try gemini-2.0-flash-exp first, fallback to gemini-1.5-flash if needed
+      let modelName = 'gemini-2.0-flash-exp'
+      let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -309,7 +311,35 @@ export class AIScanningService {
             temperature: 0.7
           }
         })
-      })
+      });
+      
+      // If first model fails, try fallback
+      if (!response.ok && response.status === 400) {
+        console.log(`⚠️ Model ${modelName} failed, trying fallback model...`)
+        modelName = 'gemini-1.5-flash'
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              maxOutputTokens: 2000,
+              temperature: 0.7
+            }
+          })
+        })
+        console.log(`🔄 Using fallback model: ${modelName}`)
+      }
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -320,7 +350,25 @@ export class AIScanningService {
       const data = await response.json()
       console.log(`✅ Gemini response received in ${Date.now() - startTime}ms`)
       
+      // Enhanced logging to debug response structure
+      console.log(`🔍 Gemini response structure:`, {
+        hasCandidates: !!data.candidates,
+        candidatesLength: data.candidates?.length || 0,
+        hasContent: !!data.candidates?.[0]?.content,
+        hasParts: !!data.candidates?.[0]?.content?.parts,
+        partsLength: data.candidates?.[0]?.content?.parts?.length || 0,
+        hasText: !!data.candidates?.[0]?.content?.parts?.[0]?.text,
+        textLength: data.candidates?.[0]?.content?.parts?.[0]?.text?.length || 0
+      })
+      
       const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      if (!responseText) {
+        console.error(`❌ Gemini response text is empty. Full response:`, JSON.stringify(data, null, 2))
+        throw new Error('Gemini returned empty response text')
+      }
+      
+      console.log(`📝 Gemini response text (first 200 chars): ${responseText.substring(0, 200)}...`)
       
       // Analyze brand mention
       const analysis = this.analyzeBrandMention(responseText, request.brandName)
