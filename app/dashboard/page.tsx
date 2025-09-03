@@ -146,8 +146,10 @@ export default function Dashboard() {
     loadMentionResults()
     // Load data sources
     fetchDataSources()
-    // Also clean up any orphaned localStorage items on component mount
-    cleanupOrphanedLocalStorageItems()
+      // Also clean up any orphaned localStorage items on component mount
+    // TEMPORARILY DISABLED: This was causing keywords to disappear during page load/refresh
+    // cleanupOrphanedLocalStorageItems()
+    console.log('⚠️ Cleanup temporarily disabled to prevent keyword removal during page load')
     // Clean up corrupted localStorage data - temporarily disabled to fix crash
     // cleanupCorruptedLocalStorage()
   }, [])
@@ -862,18 +864,47 @@ export default function Dashboard() {
           
           console.log(`✅ Loaded ${dbKeywordTracking.length} keyword tracking items from database`)
           
-          // Update localStorage with database data (this ensures topics persist after logout/login)
-          if (dbKeywordTracking.length > 0) {
-            localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))
-            console.log('💾 Synced keyword tracking data to localStorage')
-            
-            // Trigger UI refresh to show the loaded topics
-            setTrackingDataVersion(prev => prev + 1)
-          } else {
-            // Clear localStorage if no data in database
-            localStorage.removeItem('mentionTracking')
-            console.log('🗑️ Cleared localStorage - no data in database')
-          }
+               // MERGE localStorage with database data instead of overwriting
+               const existingLocalStorage = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+               console.log('🔍 Existing localStorage data:', existingLocalStorage)
+               console.log('🔍 Database keyword tracking data:', dbKeywordTracking)
+               
+               // Create a map of existing localStorage items for quick lookup
+               const existingMap = new Map()
+               existingLocalStorage.forEach((item: any) => {
+                 const key = `${item.projectId}:${item.keyword}:${item.topic}`
+                 existingMap.set(key, item)
+               })
+               
+               // Merge database data with existing localStorage data
+               const mergedTracking = [...existingLocalStorage]
+               
+               dbKeywordTracking.forEach((dbItem: any) => {
+                 const key = `${dbItem.projectId}:${dbItem.keyword}:${dbItem.topic}`
+                 if (!existingMap.has(key)) {
+                   // Add new database items to localStorage
+                   mergedTracking.push(dbItem)
+                   console.log('➕ Added new database item to localStorage:', dbItem)
+                 } else {
+                   // Update existing localStorage items with database data
+                   const existingIndex = mergedTracking.findIndex((item: any) => 
+                     item.projectId === dbItem.projectId && 
+                     item.keyword === dbItem.keyword && 
+                     item.topic === dbItem.topic
+                   )
+                   if (existingIndex !== -1) {
+                     mergedTracking[existingIndex] = { ...mergedTracking[existingIndex], ...dbItem }
+                     console.log('🔄 Updated existing localStorage item with database data:', dbItem)
+                   }
+                 }
+               })
+               
+               // Save merged data to localStorage
+               localStorage.setItem('mentionTracking', JSON.stringify(mergedTracking))
+               console.log('💾 Merged localStorage with database data:', mergedTracking.length, 'total items')
+               
+               // Trigger UI refresh to show the merged topics
+               setTrackingDataVersion(prev => prev + 1)
           
           // Clean up any orphaned localStorage entries that don't match database projects
           const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
@@ -1704,26 +1735,21 @@ export default function Dashboard() {
           toast.info(`Topic "${topic.topic}" scanned but no results returned`)
         }
         
-        // Refresh projects data to show updated results
-        await loadProjectsFromDatabase()
-        
-        // Force refresh of the tracking data to show updated positions
-        // This ensures the UI updates with new position data
-        const updatedTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-        console.log('🔄 Updated tracking data with new positions:', updatedTracking)
-        
-        // Debug: Check if the keyword-topic combination still exists after scan
-        const keywordStillExists = updatedTracking.some((item: any) => 
+        // FINAL VERIFICATION: Check if keyword still exists in localStorage after scan
+        const finalTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        const keywordStillExists = finalTracking.some((item: any) => 
           item.projectId === projectId && 
           item.keyword === topic.keyword && 
           item.topic === topic.topic
         )
-        console.log('🔍 Keyword-topic combination still exists in localStorage:', keywordStillExists)
+        console.log('🔍 FINAL CHECK - Keyword still exists in localStorage:', keywordStillExists)
+        console.log('🔍 Final localStorage content:', finalTracking)
         
         if (!keywordStillExists) {
-          console.error('❌ CRITICAL: Keyword was removed from localStorage during scan!')
-          console.error('❌ This should not happen - the keyword should persist after scan')
-          console.error('❌ Current localStorage content:', updatedTracking)
+          console.error('❌ CRITICAL ERROR: Keyword was lost during scan process!')
+          console.error('❌ This should never happen with the new logic')
+        } else {
+          console.log('✅ SUCCESS: Keyword preserved in localStorage after scan')
         }
         
         // Force refresh of the UI to show updated position data
