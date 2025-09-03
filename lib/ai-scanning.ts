@@ -422,16 +422,17 @@ export class AIScanningService {
       return { brandMentioned: false, position: null, confidence: 0, context: null }
     }
 
-    // Look for RANKING PATTERNS (not just sentence appearance)
+    // ENHANCED: Look for RANKING PATTERNS with better accuracy
     let position: number | null = null
     let context: string | null = null
     
-    // Pattern 1: Numbered lists "1. Google, 2. Bing, 3. Yandex"
+    // Pattern 1: Numbered lists "1. Google, 2. Bing, 3. Yandex" (most accurate)
     const numberedPattern = new RegExp(`(\\d+)\\s*[.):]\\s*[^\\d]*?\\b${normalizedBrand}\\b`, 'i')
     const numberedMatch = responseText.match(numberedPattern)
     if (numberedMatch) {
       position = parseInt(numberedMatch[1])
       context = numberedMatch[0]
+      console.log(`🎯 Found numbered position ${position} for brand "${brandName}"`)
     }
     
     // Pattern 2: Ordinal lists "first Google, second Bing, third Yandex"  
@@ -442,10 +443,11 @@ export class AIScanningService {
         const ordinals = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 }
         position = ordinals[ordinalMatch[1].toLowerCase() as keyof typeof ordinals] || null
         context = ordinalMatch[0]
+        console.log(`🎯 Found ordinal position ${position} for brand "${brandName}"`)
       }
     }
     
-    // Pattern 3: Position in comma-separated lists "Google, Bing, Yandex, DuckDuckGo"
+    // Pattern 3: Position in comma-separated lists "Google, Bing, Yandex, DuckDuckGo" (enhanced accuracy)
     if (!position) {
       const lines = responseText.split(/[.!?\n]+/)
       for (const line of lines) {
@@ -456,10 +458,25 @@ export class AIScanningService {
             if (items[i].toLowerCase().includes(normalizedBrand)) {
               position = i + 1
               context = line.trim()
+              console.log(`🎯 Found comma-separated position ${position} for brand "${brandName}"`)
               break
             }
           }
           if (position) break
+        }
+      }
+    }
+    
+    // Pattern 4: Bullet point lists "• Google • Bing • Yandex" (new pattern)
+    if (!position) {
+      // Simple bullet point detection
+      const bulletLines = responseText.split(/[•\-*]/).filter(line => line.trim().length > 0)
+      for (let i = 0; i < bulletLines.length; i++) {
+        if (bulletLines[i].toLowerCase().includes(normalizedBrand)) {
+          position = i + 1
+          context = bulletLines[i].trim()
+          console.log(`🎯 Found bullet point position ${position} for brand "${brandName}"`)
+          break
         }
       }
     }
@@ -474,16 +491,17 @@ export class AIScanningService {
           break
         }
       }
-      position = null  // Not in ranking context
+      console.log(`ℹ️ Brand "${brandName}" mentioned but not in ranking context`)
     }
     
     // Cap position at 10 (only track top 10 positions)
     if (position && position > 10) {
+      console.log(`⚠️ Brand "${brandName}" position ${position} beyond trackable range (top 10)`)
       position = null  // Beyond trackable range
     }
     
-    // Calculate confidence based on context
-    const confidence = this.calculateConfidence(responseText, brandName)
+    // Calculate confidence based on context and position accuracy
+    const confidence = this.calculateConfidence(responseText, brandName, position)
     
     return {
       brandMentioned: true,
@@ -548,7 +566,7 @@ export class AIScanningService {
   /**
    * Calculate confidence score for brand mention
    */
-  private calculateConfidence(responseText: string, brandName: string): number {
+  private calculateConfidence(responseText: string, brandName: string, position: number | null): number {
     let score = 0.5 // Base score
     
     const positiveKeywords = ['best', 'excellent', 'amazing', 'great', 'top', 'premium', 'quality', 'recommended', 'outstanding', 'superior', 'leading', 'innovative']
@@ -569,6 +587,11 @@ export class AIScanningService {
     // Check for specific mention patterns
     if (text.includes(`"${brandName}"`)) score += 0.2
     if (text.includes(`'${brandName}'`)) score += 0.2
+    
+    // Bonus for accurate position
+    if (position !== null) {
+      score += 0.1 * (10 - position) / 10 // Higher score for lower positions
+    }
     
     return Math.max(0, Math.min(1, score))
   }

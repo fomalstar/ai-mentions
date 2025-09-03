@@ -6,6 +6,80 @@
 
 ---
 
+## **🚨 CRITICAL: localStorage Data Loss Issue (RESOLVED)**
+
+### Issue #005: Keywords Disappearing After Scan/Refresh
+**Date:** 2025-01-31  
+**Severity:** 🔴 CRITICAL  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+- Keywords and topics disappearing immediately after scanning
+- Keywords not persisting on page refresh
+- Position data not displaying after scan completion
+- Users losing all tracking data after adding new keywords
+
+**Root Cause:**
+- `loadProjectsFromDatabase()` function was **completely overwriting** localStorage instead of merging data
+- Function called on component mount (line 143) and after topic removal (line 1506)
+- localStorage data was being replaced with ONLY database data, removing any items not in database
+- No preservation of existing localStorage data during database sync
+
+**Critical Code Locations:**
+- **Line 143**: `loadProjectsFromDatabase()` called on component mount
+- **Line 868**: `localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))` - OVERWRITES localStorage
+- **Line 887**: `localStorage.setItem('mentionTracking', JSON.stringify(cleanedTracking))` - CLEANS UP localStorage
+- **Line 1506**: `await loadProjectsFromDatabase()` called after topic removal
+
+**Resolution:**
+- **CHANGED FROM OVERWRITE TO MERGE**: Modified `loadProjectsFromDatabase()` to merge localStorage with database data
+- **Preserved Existing Data**: localStorage items are no longer lost during database sync
+- **Added Data Merging Logic**: New items from database are added, existing localStorage items are updated
+- **Disabled Aggressive Cleanup**: Temporarily disabled cleanup functions that were removing keywords
+
+**Files Modified:**
+- `app/dashboard/page.tsx` (lines 868-887: changed from overwrite to merge logic)
+
+**Code Change Required:**
+```typescript
+// OLD CODE (CAUSED DATA LOSS):
+localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))
+
+// NEW CODE (PRESERVES DATA):
+// Merge localStorage with database data instead of overwriting
+const existingLocalStorage = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+const mergedTracking = [...existingLocalStorage]
+
+dbKeywordTracking.forEach((dbItem: any) => {
+  const key = `${dbItem.projectId}:${dbItem.keyword}:${dbItem.topic}`
+  if (!existingMap.has(key)) {
+    mergedTracking.push(dbItem) // Add new items
+  } else {
+    // Update existing items with database data
+    const existingIndex = mergedTracking.findIndex(/* ... */)
+    if (existingIndex !== -1) {
+      mergedTracking[existingIndex] = { ...mergedTracking[existingIndex], ...dbItem }
+    }
+  }
+})
+
+localStorage.setItem('mentionTracking', JSON.stringify(mergedTracking))
+```
+
+**⚠️ CRITICAL WARNING:**
+- **NEVER** use `localStorage.setItem()` to completely overwrite existing data
+- **ALWAYS** merge new data with existing localStorage data
+- **NEVER** call `loadProjectsFromDatabase()` after scan operations
+- **ALWAYS** preserve user's existing localStorage data during database sync
+
+**Testing Required:**
+- Add new keyword/topic → should persist after scan
+- Refresh page → keyword should remain visible
+- Scan individual topic → position data should display
+- Keywords should not disappear during any operation
+
+---
+
 ## **🔧 Database Schema Issues (RESOLVED)**
 
 ### Issue #001: Missing scan_queue Table

@@ -88,9 +88,17 @@ export class AITrackingService {
   }
 
   private async checkWithPerplexity(trackingItem: TrackingItem): Promise<MentionResult> {
-    const prompt = `Please provide information about: ${trackingItem.topic}
+    const prompt = `You are an expert AI research analyst specializing in comprehensive topic analysis and brand positioning research.
 
-Focus on practical insights and real-world applications. Be helpful and informative.`
+Research and analyze the topic "${trackingItem.topic}" with the following requirements:
+
+1. **Comprehensive Analysis**: Provide detailed insights, current trends, and factual information
+2. **Brand Awareness**: Be aware of and mention relevant companies, brands, and market players
+3. **Market Positioning**: If discussing companies/brands, provide context about their market position
+4. **Current Information**: Focus on recent developments and up-to-date data
+5. **Source Attribution**: Include specific website URLs and sources when possible
+
+Focus on providing valuable, actionable insights that would be useful for business and marketing professionals.`
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
@@ -98,17 +106,21 @@ Focus on practical insights and real-world applications. Be helpful and informat
         'Authorization': `Bearer ${this.perplexityApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'sonar-pro',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
-      })
+              body: JSON.stringify({
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert AI research analyst specializing in comprehensive topic analysis and brand positioning research. Your task is to provide accurate, factual information about topics while being aware of brand mentions and market positioning.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 1000,
+          temperature: 0.3
+        })
     })
 
     if (!response.ok) {
@@ -156,9 +168,17 @@ Focus on practical insights and real-world applications. Be helpful and informat
   }
 
   private async checkWithGemini(trackingItem: TrackingItem): Promise<MentionResult> {
-    const prompt = `Please provide information about: ${trackingItem.topic}
+    const prompt = `You are an expert AI research analyst specializing in comprehensive topic analysis and brand positioning research.
 
-Focus on practical insights and real-world applications. Be helpful and informative.`
+Research and analyze the topic "${trackingItem.topic}" with the following requirements:
+
+1. **Comprehensive Analysis**: Provide detailed insights, current trends, and factual information
+2. **Brand Awareness**: Be aware of and mention relevant companies, brands, and market players
+3. **Market Positioning**: If discussing companies/brands, provide context about their market position
+4. **Current Information**: Focus on recent developments and up-to-date data
+5. **Source Attribution**: Include specific website URLs and sources when possible
+
+Focus on providing valuable, actionable insights that would be useful for business and marketing professionals.`
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.geminiApiKey}`, {
       method: 'POST',
@@ -177,7 +197,7 @@ Focus on practical insights and real-world applications. Be helpful and informat
         ],
         generationConfig: {
           maxOutputTokens: 1000,
-          temperature: 0.7
+          temperature: 0.3
         }
       })
     })

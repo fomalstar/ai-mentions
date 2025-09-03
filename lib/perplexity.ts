@@ -228,13 +228,23 @@ Return ONLY a JSON array of keywords, no explanations:
       throw new Error('PERPLEXITY_API_KEY environment variable is not set')
     }
 
-    const prompt = `Provide real-time insights about the keyword "${keyword}" including:
-    - Current market trends
-    - Recent developments
-    - Popular AI queries related to this topic
-    - Emerging opportunities
-    
-    Keep it concise and actionable.`
+    const prompt = `You are an expert market analyst and business intelligence specialist. Provide real-time, actionable insights about the keyword "${keyword}" including:
+
+**Required Analysis:**
+1. **Current Market Trends** - What's happening right now in this space?
+2. **Recent Developments** - Major news, product launches, or industry changes
+3. **Popular AI Queries** - What are people asking about this topic?
+4. **Emerging Opportunities** - New markets, use cases, or business models
+5. **Competitive Landscape** - Key players and market positioning
+6. **Search Behavior** - How people are searching for this information
+
+**Focus Areas:**
+- Business and marketing applications
+- Technology trends and innovations
+- Market demand and growth potential
+- Practical use cases and implementation
+
+Keep the response concise, factual, and immediately actionable for business professionals. Include specific examples and data points when available.`
 
     try {
       const response = await fetch(this.baseUrl, {

@@ -111,8 +111,24 @@ export class DataForSEOClient {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify([{
-          system_message: "You are a helpful AI assistant that provides informative and accurate responses about various topics. Focus on providing valuable insights and mention relevant companies or brands when appropriate.",
-          user_prompt: `Provide comprehensive information about ${keyword}. Include relevant companies, trends, and insights. Keep the response informative and business-focused.`,
+          system_message: "You are an expert AI business analyst and market intelligence specialist. Your role is to provide comprehensive, accurate, and actionable insights about business topics, keywords, and market trends. Focus on delivering valuable information that helps businesses make informed decisions. Always provide factual, up-to-date information and mention relevant companies, brands, and market players when appropriate.",
+          user_prompt: `Analyze the keyword "${keyword}" comprehensively and provide:
+
+**Required Analysis:**
+1. **Market Overview** - Current state and size of this market/industry
+2. **Key Players** - Major companies, brands, and competitors in this space
+3. **Trends & Insights** - Current market trends and emerging opportunities
+4. **Business Applications** - How businesses can leverage this keyword/topic
+5. **Search Behavior** - What people are looking for and why
+6. **Actionable Insights** - Specific recommendations for businesses
+
+**Focus on:**
+- Business and marketing applications
+- Technology trends and innovations
+- Market demand and growth potential
+- Practical use cases and implementation strategies
+
+Provide comprehensive, business-focused information that would be valuable for marketing professionals, business owners, and strategic planners.`,
           model_name: "gpt-4.1-mini",
           max_output_tokens: 1000,
           temperature: 0.3,

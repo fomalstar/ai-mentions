@@ -63,6 +63,67 @@
 - [x] Deploy to Render cloud platform with automated builds
 - [x] Set up development and production environment configurations
 
+---
+
+## **🚨 CRITICAL: localStorage Data Management Architecture**
+
+### **Data Persistence Strategy**
+**Status:** ✅ IMPLEMENTED  
+**Last Updated:** 2025-01-31
+
+**Core Principle:**
+- **NEVER overwrite localStorage data completely**
+- **ALWAYS merge new data with existing data**
+- **Preserve user's existing data during database sync operations**
+
+### **Why This Matters**
+The platform experienced a critical bug where keywords and topics were disappearing immediately after scanning or page refresh. This was caused by the `loadProjectsFromDatabase()` function completely overwriting localStorage instead of merging data.
+
+### **Implementation Pattern**
+```typescript
+// ❌ WRONG - Causes data loss:
+localStorage.setItem('mentionTracking', JSON.stringify(dbKeywordTracking))
+
+// ✅ CORRECT - Preserves existing data:
+const existingLocalStorage = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+const mergedTracking = [...existingLocalStorage]
+
+// Add new items from database
+dbKeywordTracking.forEach((dbItem: any) => {
+  const key = `${dbItem.projectId}:${dbItem.keyword}:${dbItem.topic}`
+  if (!existingMap.has(key)) {
+    mergedTracking.push(dbItem)
+  } else {
+    // Update existing items with database data
+    const existingIndex = mergedTracking.findIndex(/* ... */)
+    if (existingIndex !== -1) {
+      mergedTracking[existingIndex] = { ...mergedTracking[existingIndex], ...dbItem }
+    }
+  }
+})
+
+localStorage.setItem('mentionTracking', JSON.stringify(mergedTracking))
+```
+
+### **Critical Functions to Monitor**
+- `loadProjectsFromDatabase()` - Must use merge logic, never overwrite
+- `cleanupOrphanedLocalStorageItems()` - Temporarily disabled to prevent data loss
+- Any function that calls `localStorage.setItem()` with tracking data
+
+### **Testing Requirements**
+- Keywords must persist after scan operations
+- Data must survive page refresh
+- New items from database must be added to existing localStorage
+- Existing localStorage items must be updated, not replaced
+
+### **Future Development Rules**
+1. **Never use `localStorage.setItem()` to completely replace existing data**
+2. **Always implement merge logic when syncing with database**
+3. **Test data persistence after every localStorage modification**
+4. **Document any changes to localStorage management functions**
+
+---
+
 ### Stage 2: Core Features (COMPLETED)
 **Duration:** 2-3 months (Completed)
 **Dependencies:** Stage 1 completion
