@@ -509,7 +509,8 @@ export default function Dashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               brandTrackingId: project.id, // Use the actual database brand tracking ID
-              keywordTrackingId: keywordTrackingId, // Scan ONLY this specific keyword (or undefined to scan all)
+              keyword: trackingItem.keyword, // Send the specific keyword
+              topic: trackingItem.topic,     // Send the specific topic
               immediate: true 
             })
           })
@@ -820,8 +821,9 @@ export default function Dashboard() {
           const dbKeywordTracking: any[] = []
           
           data.brandTracking.forEach((tracking: any) => {
-            if (tracking.keywords && Array.isArray(tracking.keywords)) {
-              tracking.keywords.forEach((kw: any) => {
+            // Use keywordTracking array which contains the actual keyword-topic combinations
+            if (tracking.keywordTracking && Array.isArray(tracking.keywordTracking)) {
+              tracking.keywordTracking.forEach((kw: any) => {
                 dbKeywordTracking.push({
                   id: kw.id,
                   projectId: tracking.id,
@@ -858,7 +860,7 @@ export default function Dashboard() {
           // Calculate stats from loaded projects
           const totalProjects = dbProjects.length
           const activeKeywords = data.brandTracking.reduce((sum: number, tracking: any) => 
-            sum + (tracking.keywords?.length || 0), 0
+            sum + (tracking.keywordTracking?.length || 0), 0
           )
           const totalMentions = dbProjects.reduce((sum, project) => sum + project.mentionsFound, 0)
           const thisMonthMentions = 0 // We'll calculate this later when we have time-based data
@@ -946,8 +948,8 @@ export default function Dashboard() {
           brandName: newProject.brandName,
           description: newProject.description,
           website: newProject.website,
-          keywords: [newProject.name], // Use project name as initial keyword
-          topics: [newProject.description] // Use description as initial topic
+          keywords: [newProject.brandName], // Use brand name as initial keyword
+          topics: [newProject.description || `Research about ${newProject.brandName}`] // Use description or generate topic
         })
       })
       
@@ -1076,20 +1078,27 @@ export default function Dashboard() {
     }
     
     try {
-      // Save topic to database
+      // Create a new keyword tracking entry for the existing project
+      // We need to create the keyword tracking entry directly since this is an existing project
       const response = await fetch('/api/mentions/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandName: project.brandName,
           keywords: [keywordResults.keyword],
-          topics: [topic.question]
+          topics: [topic.question],
+          // Add a flag to indicate this is adding to existing project
+          addToExisting: true,
+          projectId: project.id
         })
       })
       
       if (response.ok) {
         console.log('✅ Topic saved to database')
         toast.success(`"${topic.question}" added to "${project.name}" for tracking`)
+        
+        // Refresh projects data to get the updated state
+        await loadProjectsFromDatabase()
       } else {
         console.error('❌ Failed to save topic to database')
         toast.error('Failed to save topic to database')
@@ -2940,6 +2949,28 @@ export default function Dashboard() {
                 >
                   <Plus className="w-4 h-4" />
                   New Project
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/debug-mention-tracking')
+                      if (response.ok) {
+                        const data = await response.json()
+                        console.log('🔍 Debug Mention Tracking:', data)
+                        toast.success('Debug data logged to console')
+                      } else {
+                        toast.error('Failed to get debug data')
+                      }
+                    } catch (error) {
+                      console.error('Debug error:', error)
+                      toast.error('Debug failed')
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Search className="w-4 h-4" />
+                  Debug Tracking
                 </button>
               </div>
 

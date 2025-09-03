@@ -81,9 +81,11 @@ export async function GET(request: NextRequest) {
           
           try {
             // Recreate keyword tracking entries from brand.keywords array
+            // Since topics is a relation to Topic model, we'll use default topics
             for (let i = 0; i < brand.keywords.length; i++) {
               const keyword = brand.keywords[i]
-              const topic = brand.topics?.[i] || `Research about ${keyword}`
+              // Use a meaningful default topic since we can't access brand.topics array
+              const topic = `Research about ${keyword} and related trends`
               
               await prisma.keywordTracking.upsert({
                 where: {
