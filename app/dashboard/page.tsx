@@ -1707,14 +1707,16 @@ export default function Dashboard() {
         // Refresh projects data to show updated results
         await loadProjectsFromDatabase()
         
-        // Also refresh the tracking data to show updated scan counts and positions
-        const tracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-        setTrackingDataVersion(prev => prev + 1)
-        
         // Force refresh of the tracking data to show updated positions
         // This ensures the UI updates with new position data
         const updatedTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
         console.log('🔄 Updated tracking data with new positions:', updatedTracking)
+        
+        // Force refresh of the UI to show updated position data
+        setTrackingDataVersion(prev => prev + 1)
+        
+        // Also force a re-render of the projects to show updated scan counts
+        setProjects(prev => [...prev])
         
         // Refresh data sources after a short delay (like full project scan does)
         setTimeout(fetchDataSources, 1000)
