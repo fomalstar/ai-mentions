@@ -1712,6 +1712,20 @@ export default function Dashboard() {
         const updatedTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
         console.log('🔄 Updated tracking data with new positions:', updatedTracking)
         
+        // Debug: Check if the keyword-topic combination still exists after scan
+        const keywordStillExists = updatedTracking.some((item: any) => 
+          item.projectId === projectId && 
+          item.keyword === topic.keyword && 
+          item.topic === topic.topic
+        )
+        console.log('🔍 Keyword-topic combination still exists in localStorage:', keywordStillExists)
+        
+        if (!keywordStillExists) {
+          console.error('❌ CRITICAL: Keyword was removed from localStorage during scan!')
+          console.error('❌ This should not happen - the keyword should persist after scan')
+          console.error('❌ Current localStorage content:', updatedTracking)
+        }
+        
         // Force refresh of the UI to show updated position data
         setTrackingDataVersion(prev => prev + 1)
         
