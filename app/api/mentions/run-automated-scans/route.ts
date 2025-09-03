@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { aiScanningService } from '@/lib/ai-scanning'
 
 export async function POST(request: NextRequest) {
+  // TEMPORARILY DISABLED: Automated scans disabled until database schema is migrated
+  return NextResponse.json({ 
+    error: 'Automated scans temporarily disabled. Please contact support.' 
+  }, { status: 503 })
+  
+  /*
   try {
     // This endpoint should be called by a scheduled task (cron job)
     // It will run automated scans for all enabled projects and topics
@@ -146,9 +152,16 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
+  */
 }
 
 export async function GET(request: NextRequest) {
+  // TEMPORARILY DISABLED: Automated scans disabled until database schema is migrated
+  return NextResponse.json({ 
+    error: 'Automated scans temporarily disabled. Please contact support.' 
+  }, { status: 503 })
+  
+  /*
   try {
     // Get status of automated scanning
     const enabledBrands = await prisma.brandTracking.findMany({
@@ -193,4 +206,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
+  */
 }

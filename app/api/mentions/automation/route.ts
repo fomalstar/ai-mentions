@@ -4,6 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
+  // TEMPORARILY DISABLED: Automation API disabled until database schema is migrated
+  return NextResponse.json({ 
+    error: 'Automation API temporarily disabled. Please contact support.' 
+  }, { status: 503 })
+  
+  /*
   try {
     const session = await getServerSession(authOptions)
     
@@ -149,9 +155,16 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
+  */
 }
 
 export async function GET(request: NextRequest) {
+  // TEMPORARILY DISABLED: Automation API disabled until database schema is migrated
+  return NextResponse.json({ 
+    error: 'Automation API temporarily disabled. Please contact support.' 
+  }, { status: 503 })
+  
+  /*
   try {
     const session = await getServerSession(authOptions)
     
@@ -223,4 +236,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
+  */
 }
