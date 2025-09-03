@@ -158,6 +158,15 @@ export default function Dashboard() {
       console.log('🔄 Tracking data updated, triggering UI refresh...')
     }
   }, [trackingDataVersion])
+  
+  // Debug: Monitor projects state changes
+  useEffect(() => {
+    console.log('📋 Projects state changed:', {
+      count: projects?.length || 0,
+      projects: projects,
+      localStorage: JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+    })
+  }, [projects])
 
   const fetchDataSources = async () => {
     try {
@@ -860,6 +869,22 @@ export default function Dashboard() {
             
             // Trigger UI refresh to show the loaded topics
             setTrackingDataVersion(prev => prev + 1)
+          } else {
+            // Clear localStorage if no data in database
+            localStorage.removeItem('mentionTracking')
+            console.log('🗑️ Cleared localStorage - no data in database')
+          }
+          
+          // Clean up any orphaned localStorage entries that don't match database projects
+          const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+          const validProjectIds = new Set(dbProjects.map(p => p.id))
+          const cleanedTracking = existingTracking.filter((item: any) => 
+            validProjectIds.has(item.projectId)
+          )
+          
+          if (cleanedTracking.length !== existingTracking.length) {
+            localStorage.setItem('mentionTracking', JSON.stringify(cleanedTracking))
+            console.log(`🧹 Cleaned up localStorage: removed ${existingTracking.length - cleanedTracking.length} orphaned entries`)
           }
           
           // Calculate stats from loaded projects
@@ -963,10 +988,29 @@ export default function Dashboard() {
         console.log('✅ Project saved to database:', savedProject)
         
         // Update local state with the saved project (including real ID from database)
-        setProjects(prev => [...prev, {
+        const projectWithDatabaseId = {
           ...newProject,
-          id: savedProject.id || newProject.id
-        }])
+          id: savedProject.tracking.id // Use the actual database ID from the API response
+        }
+        
+        console.log('🔄 Updating projects with database ID:', {
+          oldId: newProject.id,
+          newDatabaseId: savedProject.tracking.id,
+          fullResponse: savedProject
+        })
+        
+        setProjects(prev => [...prev, projectWithDatabaseId])
+        
+        // Also update localStorage to use database ID
+        const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        const updatedTracking = existingTracking.map((item: any) => 
+          item.projectId === newProject.id 
+            ? { ...item, projectId: savedProject.tracking.id }
+            : item
+        )
+        localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+        
+        console.log('💾 Updated localStorage with database ID')
         
         // Update stats
         if (stats) {
@@ -977,6 +1021,13 @@ export default function Dashboard() {
         }
         
         toast.success('Project created and saved to database!')
+        
+        // Debug: Log the current state after project creation
+        console.log('🔍 After project creation - Current state:', {
+          projects: projects,
+          localStorage: JSON.parse(localStorage.getItem('mentionTracking') || '[]'),
+          newProjectId: savedProject.tracking.id
+        })
       } else {
         const errorData = await response.json()
         console.error('❌ Failed to save project to database:', errorData)
@@ -3149,8 +3200,19 @@ export default function Dashboard() {
                       const response = await fetch('/api/debug-mention-tracking')
                       if (response.ok) {
                         const data = await response.json()
-                        console.log('🔍 Debug Mention Tracking:', data)
-                        toast.success('Debug data logged to console')
+                        console.log('🔍 Database Debug Info:', data)
+                        
+                        // Also log localStorage state for comparison
+                        const localStorageData = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+                        console.log('💾 localStorage State:', localStorageData)
+                        
+                        // Log projects state
+                        console.log('📋 Projects State:', projects)
+                        
+                        // Log stats state
+                        console.log('📊 Stats State:', stats)
+                        
+                        toast.success('Debug info logged to console')
                       } else {
                         toast.error('Failed to get debug data')
                       }
@@ -3163,6 +3225,23 @@ export default function Dashboard() {
                 >
                   <Search className="w-4 h-4" />
                   Debug Tracking
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    try {
+                      console.log('🔄 Manually syncing localStorage with database...')
+                      await loadProjectsFromDatabase()
+                      toast.success('localStorage synced with database')
+                    } catch (error) {
+                      console.error('Sync error:', error)
+                      toast.error('Sync failed')
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Sync localStorage
                 </button>
               </div>
 
