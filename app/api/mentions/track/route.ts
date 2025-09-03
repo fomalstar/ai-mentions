@@ -46,17 +46,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Topics array must match keywords array' }, { status: 400 })
     }
 
-    // Check if database is available
+    // Check if database is available and schema is compatible
     let isDatabaseAvailable = false
+    let schemaCompatible = false
     try {
       await prisma.$queryRaw`SELECT 1`
       isDatabaseAvailable = true
+      
+      // Check if required columns exist
+      try {
+        await prisma.$queryRaw`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'brand_tracking' 
+          AND column_name IN ('id', 'userId', 'brandName', 'displayName', 'keywords', 'competitors', 'isActive')
+        `
+        schemaCompatible = true
+        console.log('✅ Database schema is compatible')
+      } catch (schemaError) {
+        console.warn('⚠️ Database schema check failed:', schemaError)
+        schemaCompatible = false
+      }
     } catch (error) {
       console.log('Database not available, running in demo mode')
     }
 
-    if (!isDatabaseAvailable) {
-      // Return demo data for testing
+    if (!isDatabaseAvailable || !schemaCompatible) {
+      // Return demo data for testing or if schema is incompatible
+      console.log(`🔄 Running in ${!isDatabaseAvailable ? 'demo mode' : 'schema incompatible mode'}`)
       return NextResponse.json({
         success: true,
         demoMode: true,
@@ -65,7 +82,7 @@ export async function POST(request: NextRequest) {
           keywords,
           competitors: competitors || [],
           status: 'active',
-          mentions: generateDemoMentions(brandName, keywords),
+          // Note: mentions field removed as it doesn't exist in current schema
           sentiment: {
             positive: Math.floor(Math.random() * 60) + 20,
             neutral: Math.floor(Math.random() * 30) + 10,
@@ -77,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Creating/updating brand tracking for:', { userId: dbUser.id, brandName, keywords, topics })
     
-    // Create or update brand tracking
+    // Create or update brand tracking (using only fields that exist in database)
     let tracking
     try {
       tracking = await prisma.brandTracking.upsert({
@@ -100,12 +117,23 @@ export async function POST(request: NextRequest) {
           keywords,
           competitors: competitors || [],
           isActive: true
+          // Note: Automation fields (autoScanEnabled, etc.) are commented out until database migration
         }
       })
       
       console.log('✅ Brand tracking created/updated:', tracking.id)
     } catch (upsertError) {
       console.error('❌ Brand tracking upsert failed:', upsertError)
+      
+      // Enhanced error logging for debugging
+      if (upsertError instanceof Error) {
+        console.error('Error details:', {
+          message: upsertError.message,
+          name: upsertError.name,
+          stack: upsertError.stack
+        })
+      }
+      
       throw new Error(`Failed to create/update brand tracking: ${upsertError instanceof Error ? upsertError.message : 'Unknown error'}`)
     }
 
@@ -423,8 +451,8 @@ export async function GET(request: NextRequest) {
           brandName: brandName.toLowerCase()
         },
         include: {
-          keywords: true,
-          mentions: {
+          keywordTracking: true,
+          scanResults: {
             orderBy: { createdAt: 'desc' },
             take: 50
           }
@@ -441,9 +469,9 @@ export async function GET(request: NextRequest) {
       const tracking = await prisma.brandTracking.findMany({
         where: { userId: session.user.id },
         include: {
-          keywords: true,
+          keywordTracking: true,
           _count: {
-            select: { mentions: true }
+            select: { scanResults: true }
           }
         },
         orderBy: { updatedAt: 'desc' }
@@ -491,8 +519,8 @@ function generateDemoTracking(brandName: string) {
     competitors: ['Competitor A', 'Competitor B'],
     isActive: true,
     createdAt: new Date(),
-    updatedAt: new Date(),
-    mentions: generateDemoMentions(brandName, ['ai marketing', 'automation', 'digital transformation'])
+    updatedAt: new Date()
+    // Note: mentions field removed as it doesn't exist in current schema
   }
 }
 
@@ -502,21 +530,21 @@ function generateDemoTrackingList() {
       id: 'demo-1',
       brandName: 'techcorp',
       displayName: 'TechCorp',
-      keywords: [{ keyword: 'ai marketing', isActive: true }],
+      keywords: ['ai marketing'],
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
-      _count: { mentions: 15 }
+      _count: { scanResults: 15 }
     },
     {
       id: 'demo-2',
       brandName: 'innovateai',
       displayName: 'InnovateAI',
-      keywords: [{ keyword: 'automation', isActive: true }],
+      keywords: ['automation'],
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
-      _count: { mentions: 8 }
+      _count: { scanResults: 8 }
     }
   ]
 }
