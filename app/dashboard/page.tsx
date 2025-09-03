@@ -1762,14 +1762,23 @@ export default function Dashboard() {
       const dbKeywords = new Set()
       
       // Build set of valid keyword-topic combinations from database
-      if (data.brandTracking) {
+      if (data.brandTracking && Array.isArray(data.brandTracking)) {
         data.brandTracking.forEach((brand: any) => {
-          if (brand.keywords) {
-            brand.keywords.forEach((kt: any) => {
-              dbKeywords.add(`${brand.id}:${kt.keyword}:${kt.topic}`)
+          // Use keywordTracking array which contains keyword+topic combos from DB
+          if (brand.keywordTracking && Array.isArray(brand.keywordTracking)) {
+            brand.keywordTracking.forEach((kt: any) => {
+              if (kt?.keyword && kt?.topic) {
+                dbKeywords.add(`${brand.id}:${kt.keyword}:${kt.topic}`)
+              }
             })
           }
         })
+      }
+      
+      // Safety guard: if we couldn't build any DB keywords, skip cleanup to avoid accidental removals
+      if (dbKeywords.size === 0) {
+        console.warn('⚠️ Skipping localStorage cleanup: no keywordTracking entries returned from database')
+        return
       }
       
       // Remove localStorage items that don't exist in database

@@ -1597,5 +1597,52 @@ if (dbKeywordTracking.length > 0) {
 
 ---
 
+### Issue #033: Automation Fields Caused DB 500s (RESOLVED)
+**Date:** 2025-09-03  
+**Severity:** Critical  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+API endpoints failed with 500 due to Prisma schema containing automation fields (`autoScanEnabled`, `autoScanStartedAt`, `autoScanLastRun`) that do not exist in the live database. Error: `The column autoScanEnabled does not exist`.
+
+**Resolution:**
+- Commented out automation fields in `prisma/schema.prisma` for `BrandTracking` and `KeywordTracking`.
+- Temporarily disabled automation endpoints:
+  - `app/api/mentions/automation/route.ts` (returns 503)
+  - `app/api/mentions/run-automated-scans/route.ts` (returns 503)
+- Adjusted `/api/mentions/track` to avoid referencing non-existent fields.
+
+**Prevention:**
+- Do not reintroduce automation fields without running DB migrations first.
+- If enabling automation in future, add columns via SQL migration, then uncomment schema and endpoints.
+
+---
+
+### Issue #034: Topic Refresh Removed Keyword From UI (RESOLVED)
+**Date:** 2025-09-03  
+**Severity:** High  
+**Status:** 🟢 RESOLVED
+
+**Description:**
+Clicking the single-topic refresh button would sometimes remove the keyword from the UI/localStorage, requiring re-adding it. This was due to an overly aggressive localStorage cleanup that read `brand.keywords` instead of `brand.keywordTracking` from `/api/mentions/status`. When the DB response was empty or partial, cleanup removed legitimate items.
+
+**Resolution:**
+- Updated `cleanupOrphanedLocalStorageItems` in `app/dashboard/page.tsx` to:
+  - Use `brand.keywordTracking` for DB truth.
+  - Build keys as `${brand.id}:${kt.keyword}:${kt.topic}`.
+  - Add safety guard: if no DB keywords are returned, skip cleanup (prevents accidental removals).
+
+**Files Modified:**
+- `app/dashboard/page.tsx` (fixed cleanup logic)
+- `prisma/schema.prisma` (automation fields commented)
+- `app/api/mentions/automation/route.ts` (temporarily disabled)
+- `app/api/mentions/run-automated-scans/route.ts` (temporarily disabled)
+
+**Prevention:**
+- Always prefer `keywordTracking` over `brand.keywords` for UI sync.
+- Never mutate localStorage based on empty/failed status responses.
+
+---
+
 *Last Updated: 2025-01-31*  
 *Next Review: 2025-02-07*
