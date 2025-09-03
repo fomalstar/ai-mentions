@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { KeywordLineChart, MentionBarChart, SentimentPieChart } from "@/components/charts"
-import { Search, TrendingUp, Brain, Zap, Target, Globe, BarChart3, PieChartIcon } from "lucide-react"
+import { Search, TrendingUp, Brain, Zap, Target, Globe, BarChart3, PieChartIcon, CheckCircle } from "lucide-react"
 import { AuthModal } from "@/components/auth-modal"
 
 const keywordData = [
@@ -127,20 +127,20 @@ export default function Home() {
           </div>
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
-              <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-4 mb-8 bg-gradient-to-r from-teal-600 to-violet-600 border-0 shadow-lg">
+              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-white hover:text-white hover:bg-white/10">
                 <BarChart3 className="w-4 h-4" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="keywords" className="flex items-center gap-2">
+              <TabsTrigger value="keywords" className="flex items-center gap-2 data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-white hover:text-white hover:bg-white/10">
                 <Search className="w-4 h-4" />
                 Keywords
               </TabsTrigger>
-              <TabsTrigger value="sentiment" className="flex items-center gap-2">
+              <TabsTrigger value="sentiment" className="flex items-center gap-2 data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-white hover:text-white hover:bg-white/10">
                 <PieChartIcon className="w-4 h-4" />
                 Sentiment
               </TabsTrigger>
-              <TabsTrigger value="trends" className="flex items-center gap-2">
+              <TabsTrigger value="trends" className="flex items-center gap-2 data-[state=active]:bg-white/20 data-[state=active]:text-white data-[state=active]:shadow-md transition-all text-white hover:text-white hover:bg-white/10">
                 <TrendingUp className="w-4 h-4" />
                 Trends
               </TabsTrigger>
@@ -148,94 +148,162 @@ export default function Home() {
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                <Card className="bg-gradient-to-br from-teal-50 to-teal-100/50 border-teal-200/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Keywords</CardTitle>
+                    <CardTitle className="text-sm font-medium text-teal-700">Total Keywords</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">1,247</div>
-                    <p className="text-xs text-muted-foreground">+12% from last month</p>
+                    <div className="text-3xl font-bold text-teal-800">1,247</div>
+                    <p className="text-xs text-teal-600">+12% from last month</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20">
+                <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Brand Mentions</CardTitle>
+                    <CardTitle className="text-sm font-medium text-amber-700">Brand Mentions</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-accent">3,892</div>
-                    <p className="text-xs text-muted-foreground">+24% from last month</p>
+                    <div className="text-3xl font-bold text-amber-800">3,892</div>
+                    <p className="text-xs text-amber-600">+24% from last month</p>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="bg-gradient-to-br from-violet-50 to-violet-100/50 border-violet-200/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Avg. Volume</CardTitle>
+                    <CardTitle className="text-sm font-medium text-violet-700">Avg. Search Volume</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">15.2K</div>
-                    <p className="text-xs text-muted-foreground">+8% from last month</p>
+                    <div className="text-3xl font-bold text-violet-800">15.2K</div>
+                    <p className="text-xs text-violet-600">+8% from last month</p>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200/50 hover:shadow-lg transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Sentiment Score</CardTitle>
+                    <CardTitle className="text-sm font-medium text-rose-700">AI Platforms</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-chart-3">78%</div>
-                    <p className="text-xs text-muted-foreground">+5% from last month</p>
+                    <div className="text-3xl font-bold text-rose-800">5</div>
+                    <p className="text-xs text-rose-600">ChatGPT, Gemini, Perplexity</p>
                   </CardContent>
                 </Card>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+                <Card className="bg-gradient-to-br from-indigo-50 to-purple-100/50 border-indigo-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
                   <CardHeader>
-                    <CardTitle>Keyword Volume Trends</CardTitle>
-                    <CardDescription>Monthly keyword search volume analysis</CardDescription>
+                    <CardTitle className="text-xl text-indigo-800">AI Platform Performance</CardTitle>
+                    <CardDescription className="text-indigo-600">Real-time performance metrics across AI platforms</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <KeywordLineChart data={chartData} />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="font-medium text-indigo-700">ChatGPT</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-indigo-800">89%</div>
+                          <div className="text-xs text-indigo-600">Accuracy</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                          <span className="font-medium text-indigo-700">Gemini</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-indigo-800">92%</div>
+                          <div className="text-xs text-indigo-600">Accuracy</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                          <span className="font-medium text-indigo-700">Perplexity</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-indigo-800">87%</div>
+                          <div className="text-xs text-indigo-600">Accuracy</div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-gradient-to-br from-rose-50 to-pink-100/50 border-rose-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
                   <CardHeader>
-                    <CardTitle>Mention Distribution</CardTitle>
-                    <CardDescription>Brand mentions across different platforms</CardDescription>
+                    <CardTitle className="text-xl text-rose-800">Brand Visibility Score</CardTitle>
+                    <CardDescription className="text-rose-600">Comprehensive brand mention tracking metrics</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MentionBarChart data={chartData} />
+                    <div className="space-y-4">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-rose-800 mb-2">8.7</div>
+                        <div className="text-sm text-rose-600">Overall Score</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="text-center p-3 bg-white/60 rounded-lg">
+                          <div className="text-lg font-bold text-rose-700">1,247</div>
+                          <div className="text-xs text-rose-600">Keywords</div>
+                        </div>
+                        <div className="text-center p-3 bg-white/60 rounded-lg">
+                          <div className="text-lg font-bold text-rose-700">3,892</div>
+                          <div className="text-xs text-rose-600">Mentions</div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
             <TabsContent value="keywords" className="space-y-6">
-              <Card>
+              <Card className="bg-gradient-to-br from-teal-50 to-teal-100/50 border-teal-200/50 hover:shadow-xl transition-all duration-300">
                 <CardHeader>
-                  <CardTitle>Top Performing Keywords</CardTitle>
-                  <CardDescription>AI-analyzed keyword performance and trends</CardDescription>
+                  <CardTitle className="text-xl text-teal-800">Top Performing Keywords</CardTitle>
+                  <CardDescription className="text-teal-600">AI-analyzed keyword performance with search volume and mention data</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {keywordData.map((item, index) => (
+                    {[
+                      { keyword: "artificial intelligence", volume: 125000, mentions: 2847, trend: "+45%", position: 1 },
+                      { keyword: "machine learning", volume: 89000, mentions: 1623, trend: "+28%", position: 2 },
+                      { keyword: "chatgpt alternatives", volume: 45600, mentions: 1250, trend: "+32%", position: 1 },
+                      { keyword: "AI automation tools", volume: 67000, mentions: 1445, trend: "+22%", position: 3 },
+                      { keyword: "data analytics", volume: 98000, mentions: 2567, trend: "+18%", position: 2 },
+                    ].map((item, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-4 rounded-lg border border-border bg-card/50"
+                        className="flex items-center justify-between p-4 rounded-xl border border-teal-200/50 bg-gradient-to-r from-white/80 to-teal-50/50 hover:from-teal-100/30 hover:to-teal-200/30 transition-all cursor-pointer group hover:shadow-lg"
                       >
                         <div className="flex-1">
-                          <div className="font-medium">{item.keyword}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="font-semibold text-lg text-teal-800 group-hover:text-teal-600 transition-colors">{item.keyword}</div>
+                          <div className="text-sm text-teal-600">
                             {item.volume.toLocaleString()} searches • {item.mentions} mentions
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
+                          <Badge variant="outline" className="bg-teal-100/50 text-teal-700 border-teal-300/50 font-medium px-3 py-1">
+                            #{item.position}
+                          </Badge>
                           <Badge
-                            variant={item.trend.startsWith("+") ? "default" : "secondary"}
-                            className="bg-primary/10 text-primary"
+                            variant="default"
+                            className={`font-medium px-3 py-1 ${
+                              item.trend.startsWith("+") 
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-300/50" 
+                                : "bg-red-100 text-red-700 border-red-300/50"
+                            }`}
                           >
                             {item.trend}
                           </Badge>
-                          <Progress value={Math.min((item.mentions / 1500) * 100, 100)} className="w-20" />
+                          <div className="w-20">
+                            <div className="w-full bg-teal-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-500 ${
+                                  item.trend.startsWith("+") ? "bg-emerald-500" : "bg-red-500"
+                                }`}
+                                style={{ width: `${Math.min((item.mentions / 3000) * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -246,38 +314,77 @@ export default function Home() {
 
             <TabsContent value="sentiment" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+                <Card className="bg-gradient-to-br from-violet-50 to-violet-100/50 border-violet-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
                   <CardHeader>
-                    <CardTitle>Sentiment Analysis</CardTitle>
-                    <CardDescription>AI-powered sentiment breakdown</CardDescription>
+                    <CardTitle className="text-xl text-violet-800">Sentiment Analysis</CardTitle>
+                    <CardDescription className="text-violet-600">AI-powered sentiment breakdown across all mentions</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <SentimentPieChart data={pieData} />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-emerald-500 rounded-full"></div>
+                          <span className="font-medium text-violet-700">Positive</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-violet-800">65%</div>
+                          <div className="text-sm text-violet-600">2,530 mentions</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                          <span className="font-medium text-violet-700">Neutral</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-violet-800">25%</div>
+                          <div className="text-sm text-violet-600">973 mentions</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-white/60 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-red-500 rounded-full"></div>
+                          <span className="font-medium text-violet-700">Negative</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-violet-800">10%</div>
+                          <div className="text-sm text-violet-600">389 mentions</div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
                   <CardHeader>
-                    <CardTitle>Sentiment Insights</CardTitle>
-                    <CardDescription>Key findings from AI analysis</CardDescription>
+                    <CardTitle className="text-xl text-amber-800">Sentiment Insights</CardTitle>
+                    <CardDescription className="text-amber-600">Key findings from AI analysis</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="p-4 rounded-lg bg-chart-3/10 border border-chart-3/20">
-                      <div className="font-medium text-chart-3 mb-2">Positive Sentiment (65%)</div>
-                      <p className="text-sm text-muted-foreground">
-                        Strong positive reception for AI-related keywords, particularly in productivity and automation
-                        contexts.
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-100/50 to-green-100/50 border border-emerald-300/50 hover:bg-emerald-100/60 transition-colors">
+                      <div className="font-semibold text-emerald-700 mb-2 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        Positive Sentiment (65%)
+                      </div>
+                      <p className="text-sm text-emerald-600">
+                        Strong positive reception for AI-related keywords, particularly in productivity and innovation contexts.
                       </p>
                     </div>
-                    <div className="p-4 rounded-lg bg-chart-4/10 border border-chart-4/20">
-                      <div className="font-medium text-chart-4 mb-2">Neutral Sentiment (25%)</div>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-blue-100/50 to-indigo-100/50 border border-blue-300/50 hover:bg-blue-100/60 transition-colors">
+                      <div className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-blue-500" />
+                        Neutral Sentiment (25%)
+                      </div>
+                      <p className="text-sm text-blue-600">
                         Informational content and technical discussions maintain neutral tone.
                       </p>
                     </div>
-                    <div className="p-4 rounded-lg bg-chart-5/10 border border-chart-5/20">
-                      <div className="font-medium text-chart-5 mb-2">Negative Sentiment (10%)</div>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-red-100/50 to-pink-100/50 border border-red-300/50 hover:bg-red-100/60 transition-colors">
+                      <div className="font-semibold text-red-700 mb-2 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-red-500" />
+                        Negative Sentiment (10%)
+                      </div>
+                      <p className="text-sm text-red-600">
                         Concerns mainly around job displacement and privacy issues.
                       </p>
                     </div>
@@ -287,33 +394,33 @@ export default function Home() {
             </TabsContent>
 
             <TabsContent value="trends" className="space-y-6">
-              <Card>
+              <Card className="bg-gradient-to-br from-rose-50 to-pink-100/50 border-rose-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
                 <CardHeader>
-                  <CardTitle>Trending Keywords</CardTitle>
-                  <CardDescription>Emerging keywords detected by AI analysis</CardDescription>
+                  <CardTitle className="text-xl text-rose-800">Emerging Trends</CardTitle>
+                  <CardDescription className="text-rose-600">AI-detected trending topics and opportunities</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[
-                      "AI automation",
-                      "GPT-4",
+                      "AI automation tools",
+                      "GPT-4 alternatives",
                       "machine learning ops",
                       "neural networks",
-                      "deep learning",
-                      "AI ethics",
+                      "deep learning platforms",
+                      "AI ethics frameworks",
                     ].map((keyword, index) => (
                       <div
                         key={index}
-                        className="p-4 rounded-lg border border-border bg-gradient-to-br from-primary/5 to-accent/5"
+                        className="p-4 rounded-xl border border-rose-200/50 bg-gradient-to-br from-white/80 to-rose-50/50 hover:from-rose-100/30 hover:to-rose-200/30 transition-all cursor-pointer group hover:shadow-lg hover:scale-105"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">{keyword}</span>
-                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          <span className="font-medium text-rose-800 group-hover:text-rose-600 transition-colors">{keyword}</span>
+                          <Badge variant="secondary" className="bg-rose-100/50 text-rose-700 border-rose-300/50">
                             <TrendingUp className="w-3 h-3 mr-1" />
-                            Hot
+                            Trending
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-rose-600">
                           +{Math.floor(Math.random() * 50 + 10)}% growth
                         </div>
                       </div>
