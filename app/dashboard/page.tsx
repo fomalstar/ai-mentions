@@ -622,55 +622,29 @@ export default function Dashboard() {
     }
   }
 
-  // Enable 24-hour automation for all topics in a project (one-time setup)
-  const enableAutomationForProject = async (projectId: string) => {
+  // Simple click once per day function for all projects
+  const handleAllProjectsClick = async () => {
     try {
-      const response = await fetch('/api/mentions/automation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'enable',
-          brandTrackingId: projectId
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        toast.success('24-hour automation enabled for all topics in this project! They will be scanned automatically every 24 hours.')
-        
-        // Refresh projects data to show updated automation status
-        await loadProjectsFromDatabase()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to enable automation')
-      }
-    } catch (error) {
-      console.error('Enable project automation error:', error)
-      toast.error('Failed to enable automation')
-    }
-  }
-
-  // Enable 24-hour automation for all projects (one-time setup)
-  const enableAutomationForAllProjects = async () => {
-    try {
-      // Check if any project already has automation enabled
-      if (projects.some(p => p.autoScanEnabled)) {
-        toast.info('24-hour automation is already enabled for some projects')
+      // Check if projects were already clicked today
+      const today = new Date().toISOString().split('T')[0]
+      const lastClicked = localStorage.getItem('allProjectsLastClicked') || null
+      
+      if (lastClicked && lastClicked.startsWith(today)) {
+        toast.info('All projects have already been scanned today. Come back tomorrow!')
         return
       }
 
-      // Enable automation for each project
-      for (const project of projects) {
-        await enableAutomationForProject(project.id)
-      }
-
-      toast.success('24-hour automation enabled for all projects! All topics will be scanned automatically every 24 hours.')
+      // Mark as clicked today
+      localStorage.setItem('allProjectsLastClicked', today)
       
-      // Refresh projects data to show updated automation status
-      await loadProjectsFromDatabase()
+      // Run the full scan
+      await startFullScanAllProjects()
+      
+      toast.success('All projects scanned successfully! You can scan all projects again tomorrow.')
+      
     } catch (error) {
-      console.error('Enable all projects automation error:', error)
-      toast.error('Failed to enable automation for all projects')
+      console.error('All projects click error:', error)
+      toast.error('Failed to scan all projects')
     }
   }
 
@@ -870,11 +844,11 @@ export default function Dashboard() {
             mentionsFound: tracking.totalMentions || 0,
             lastActivity: tracking.updatedAt ? new Date(tracking.updatedAt).toISOString() : new Date().toISOString(),
             
-            // Automation fields
-            autoScanEnabled: tracking.autoScanEnabled || false,
-            autoScanStartedAt: tracking.autoScanStartedAt ? new Date(tracking.autoScanStartedAt).toISOString() : undefined,
-            autoScanLastRun: tracking.autoScanLastRun ? new Date(tracking.autoScanLastRun).toISOString() : undefined,
-            nextScanAt: tracking.nextScanAt ? new Date(tracking.nextScanAt).toISOString() : undefined
+            // Automation fields (temporarily disabled)
+            autoScanEnabled: false,
+            autoScanStartedAt: undefined,
+            autoScanLastRun: undefined,
+            nextScanAt: undefined
           }))
           
           console.log(`✅ Loaded ${dbProjects.length} projects from database`)
@@ -905,10 +879,10 @@ export default function Dashboard() {
                   geminiPosition: kw.geminiPosition,
                   positionChange: kw.positionChange,
                   scanCount: kw.scanCount,
-                  // Automation fields
-                  autoScanEnabled: kw.autoScanEnabled || false,
-                  autoScanStartedAt: kw.autoScanStartedAt ? new Date(kw.autoScanStartedAt).toISOString() : null,
-                  autoScanLastRun: kw.autoScanLastRun ? new Date(kw.autoScanLastRun).toISOString() : null
+                  // Automation fields (temporarily disabled)
+                  autoScanEnabled: false,
+                  autoScanStartedAt: null,
+                  autoScanLastRun: null
                 })
               })
             }
@@ -1528,55 +1502,41 @@ export default function Dashboard() {
     }
   }
 
-  // Enable 24-hour automation for a single topic (one-time setup)
-  const enableAutomationForTopic = async (projectId: string, topic: any) => {
+  // Simple click once per day function for topics
+  const handleTopicClick = async (projectId: string, topic: any) => {
     try {
-      // Check if automation is already enabled
-      if (topic.autoScanEnabled) {
-        toast.info('24-hour automation is already enabled for this topic')
+      // Check if topic was already clicked today
+      const today = new Date().toISOString().split('T')[0]
+      const lastClicked = topic.lastClicked || null
+      
+      if (lastClicked && lastClicked.startsWith(today)) {
+        toast.info('This topic has already been clicked today. Come back tomorrow!')
         return
       }
 
-      const response = await fetch('/api/mentions/automation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'enable',
-          keywordTrackingId: topic.id
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        toast.success('24-hour automation enabled for this topic! It will be scanned automatically every 24 hours.')
-        
-        // Refresh projects data to show updated automation status
-        await loadProjectsFromDatabase()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to enable automation')
-      }
+      // Mark topic as clicked today
+      const updatedTopic = { ...topic, lastClicked: today }
+      
+      // Update localStorage
+      const tracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+      const updatedTracking = tracking.map((item: any) => 
+        item.id === topic.id ? updatedTopic : item
+      )
+      localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+      
+      // Run the topic scan
+      await refreshSingleTopic(projectId, updatedTopic)
+      
+      toast.success('Topic scanned successfully! You can click this topic again tomorrow.')
+      
     } catch (error) {
-      console.error('Enable automation error:', error)
-      toast.error('Failed to enable automation')
+      console.error('Topic click error:', error)
+      toast.error('Failed to process topic click')
     }
   }
 
-  // Refresh a single topic by scanning it (with 24-hour limit)
+  // Refresh a single topic by scanning it
   const refreshSingleTopic = async (projectId: string, topic: any) => {
-    // Check if enough time has passed since last scan (24 hours)
-    if (topic.lastChecked) {
-      const lastScanTime = new Date(topic.lastChecked).getTime()
-      const currentTime = Date.now()
-      const timeSinceLastScan = currentTime - lastScanTime
-      const hoursSinceLastScan = timeSinceLastScan / (1000 * 60 * 60)
-      
-      if (hoursSinceLastScan < 24) {
-        const remainingHours = Math.ceil(24 - hoursSinceLastScan)
-        toast.info(`Topic can only be refreshed once per day. Please wait ${remainingHours} more hours.`)
-        return
-      }
-    }
     try {
       const topicKey = `${projectId}-${topic.keyword}-${topic.topic}`
       setRefreshingTopics(prev => new Set(prev).add(topicKey))
@@ -2572,24 +2532,16 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
-                    {/* Enable 24-hour automation for all projects */}
+                    {/* Scan all projects once per day */}
                     <Button 
                       size="sm"
                       variant="outline"
-                      onClick={() => enableAutomationForAllProjects()}
-                      disabled={projects.some(p => p.autoScanEnabled)}
-                      className={`${
-                        projects.some(p => p.autoScanEnabled) 
-                          ? 'border-green-600 text-green-600 bg-green-50 cursor-not-allowed' 
-                          : 'border-blue-600 text-blue-600 hover:bg-blue-50'
-                      }`}
-                      title={projects.some(p => p.autoScanEnabled) 
-                        ? '24-hour automation already enabled for all projects' 
-                        : 'Click once to enable 24-hour automated scanning for all projects'
-                      }
+                      onClick={() => handleAllProjectsClick()}
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      title="Click once per day to scan all projects"
                     >
                       <Zap className="w-4 h-4 mr-2" />
-                      {projects.some(p => p.autoScanEnabled) ? 'Auto Enabled' : 'Enable Auto'}
+                      Scan All Daily
                     </Button>
                     
                     <Button 
@@ -2819,21 +2771,13 @@ export default function Dashboard() {
                                                 <Badge variant="outline" className="text-xs">
                                                   {hasMentions ? `${analytics.totalMentions} mentions` : 'Monitoring'}
                                                 </Badge>
-                                                {/* Enable 24-hour automation for single topic */}
+                                                {/* Click once per day for topic */}
                                                 <Button 
                                                   variant="ghost"
                                                   size="sm"
-                                                  onClick={() => enableAutomationForTopic(projectId, topic)}
-                                                  disabled={topic.autoScanEnabled}
-                                                  className={`${
-                                                    topic.autoScanEnabled 
-                                                      ? 'text-green-600 bg-green-50 cursor-not-allowed' 
-                                                      : 'text-blue-600 hover:bg-blue-50'
-                                                  }`}
-                                                  title={topic.autoScanEnabled 
-                                                    ? '24-hour automation already enabled for this topic' 
-                                                    : 'Click once to enable 24-hour automated scanning for this topic'
-                                                  }
+                                                  onClick={() => handleTopicClick(projectId, topic)}
+                                                  className="text-blue-600 hover:bg-blue-50"
+                                                  title="Click once per day to scan this topic"
                                                 >
                                                   <Zap className="w-4 h-4" />
                                                 </Button>
@@ -2843,20 +2787,9 @@ export default function Dashboard() {
                                                   variant="ghost" 
                                                   size="sm"
                                                   onClick={() => refreshSingleTopic(projectId, topic)}
-                                                  disabled={
-                                                    refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ||
-                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
-                                                  }
-                                                  className={`${
-                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
-                                                      ? 'text-gray-400 cursor-not-allowed' 
-                                                      : 'text-blue-500 hover:text-blue-700 hover:bg-blue-50'
-                                                  } disabled:opacity-50`}
-                                                  title={
-                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
-                                                      ? 'Topic can only be refreshed once per day'
-                                                      : 'Manual refresh (scan now)'
-                                                  }
+                                                  disabled={refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`)}
+                                                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                                  title="Manual refresh (scan now)"
                                                 >
                                                   <RefreshCw className={`w-4 h-4 ${refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ? 'animate-spin' : ''}`} />
                                                 </Button>

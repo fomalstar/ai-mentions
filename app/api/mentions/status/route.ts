@@ -58,10 +58,7 @@ export async function GET(request: NextRequest) {
               positionChange: true,
               lastScanAt: true,
               scanCount: true,
-              // Automation fields
-              autoScanEnabled: true,
-              autoScanStartedAt: true,
-              autoScanLastRun: true
+              // Automation fields temporarily disabled
             }
           },
           _count: {
@@ -166,10 +163,7 @@ export async function GET(request: NextRequest) {
                 positionChange: true,
                 lastScanAt: true,
                 scanCount: true,
-                // Automation fields
-                autoScanEnabled: true,
-                autoScanStartedAt: true,
-                autoScanLastRun: true
+                // Automation fields temporarily disabled
               }
             }
           }
