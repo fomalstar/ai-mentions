@@ -1509,18 +1509,28 @@ export default function Dashboard() {
         // Process scan results like the full project scan does
         if (scanData.results && Array.isArray(scanData.results) && scanData.results.length > 0) {
           console.log(`📊 Processing ${scanData.results.length} scan results for single topic`)
+          console.log(`🔍 Full scan results structure:`, JSON.stringify(scanData.results, null, 2))
           
           // The scanData.results is an array of keyword results, each with their own results array
           for (const keywordResult of scanData.results) {
             if (keywordResult.results && Array.isArray(keywordResult.results)) {
               console.log(`🔍 Processing ${keywordResult.results.length} platform results for keyword: ${keywordResult.keyword}`)
               
-              // Process each platform result (ChatGPT, Perplexity, Gemini)
-              for (const platformResult of keywordResult.results) {
-                if (platformResult.platform === 'error') {
-                  console.warn(`⚠️ Platform error: ${platformResult.responseText}`)
-                  continue
-                }
+                             // Process each platform result (ChatGPT, Perplexity, Gemini)
+               for (const platformResult of keywordResult.results) {
+                 console.log(`🔍 Processing platform result:`, {
+                   platform: platformResult.platform,
+                   brandMentioned: platformResult.brandMentioned,
+                   position: platformResult.position,
+                   hasSourceUrls: !!platformResult.sourceUrls,
+                   sourceUrlsCount: platformResult.sourceUrls?.length || 0,
+                   sourceUrls: platformResult.sourceUrls
+                 })
+                 
+                 if (platformResult.platform === 'error') {
+                   console.warn(`⚠️ Platform error: ${platformResult.responseText}`)
+                   continue
+                 }
                 
                 // Create mention result in the same format as full project scan
                 const mentionResult = {
@@ -1529,28 +1539,61 @@ export default function Dashboard() {
                   keyword: topic.keyword,
                   topic: topic.topic,
                   brandName: project.brandName,
-                  platform: platformResult.platform,
+                  source: platformResult.platform, // Use 'source' to match UI expectations
                   hasMention: platformResult.brandMentioned,
                   position: platformResult.position,
                   confidence: platformResult.confidence,
                   responseText: platformResult.responseText,
                   sourceUrls: platformResult.sourceUrls || [],
                   scanDuration: platformResult.scanDuration,
-                  detectedAt: new Date().toISOString()
+                  detectedAt: new Date().toISOString(),
+                  // Add additional fields to match full project scan format
+                  mentionType: platformResult.brandMentioned ? 'positive' : 'neutral',
+                  content: platformResult.brandMentioned 
+                    ? `Found mention of ${project.brandName} in ${platformResult.platform} response about "${topic.topic}" at position ${platformResult.position}`
+                    : `No mention of ${project.brandName} found in ${platformResult.platform} response about "${topic.topic}"`,
+                  aiResponse: platformResult.responseText || `AI response from ${platformResult.platform} about ${topic.topic}`
                 }
                 
-                // Add to mention results
-                setMentionResults(prev => [mentionResult, ...prev])
+                // Add to mention results (remove old results for this topic first)
+                setMentionResults(prev => {
+                  const filtered = prev.filter(m => 
+                    !(m.projectId === projectId && m.topic === topic.topic && m.platform === platformResult.platform)
+                  )
+                  return [mentionResult, ...filtered]
+                })
                 
-                // Update localStorage with new mention data
+                // Update localStorage with new mention data and position updates
                 const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
                 const updatedTracking = existingTracking.map((item: any) => {
                   if (item.projectId === projectId && item.keyword === topic.keyword && item.topic === topic.topic) {
-                    return {
+                    // Update position data based on platform
+                    const updatedItem = {
                       ...item,
                       lastChecked: new Date().toISOString(),
                       scanCount: (item.scanCount || 0) + 1
                     }
+                    
+                    // Update platform-specific positions
+                    if (platformResult.platform === 'chatgpt') {
+                      updatedItem.chatgptPosition = platformResult.position
+                    } else if (platformResult.platform === 'perplexity') {
+                      updatedItem.perplexityPosition = platformResult.position
+                    } else if (platformResult.platform === 'gemini') {
+                      updatedItem.geminiPosition = platformResult.position
+                    }
+                    
+                    // Calculate average position if we have multiple platforms
+                    const positions = []
+                    if (updatedItem.chatgptPosition) positions.push(updatedItem.chatgptPosition)
+                    if (updatedItem.perplexityPosition) positions.push(updatedItem.perplexityPosition)
+                    if (updatedItem.geminiPosition) positions.push(updatedItem.geminiPosition)
+                    
+                    if (positions.length > 0) {
+                      updatedItem.avgPosition = positions.reduce((sum, pos) => sum + pos, 0) / positions.length
+                    }
+                    
+                    return updatedItem
                   }
                   return item
                 })
@@ -1558,6 +1601,8 @@ export default function Dashboard() {
                 
                 // Process source URLs if available
                 if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                  console.log(`🔗 Processing ${platformResult.sourceUrls.length} source URLs for ${platformResult.platform}:`, platformResult.sourceUrls)
+                  
                   const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
                     id: `source-${Date.now()}-${Math.random()}`,
                     url: urlData.url,
@@ -1570,8 +1615,25 @@ export default function Dashboard() {
                   }))
                   
                   // Add to data sources
-                  setDataSources(prev => [...sourceUrls, ...prev])
+                  setDataSources(prev => {
+                    const updated = [...sourceUrls, ...prev]
+                    console.log(`📊 Updated data sources: ${updated.length} total (added ${sourceUrls.length} new)`)
+                    return updated
+                  })
+                  
+                  // Also update localStorage for data sources
+                  const existingSources = JSON.parse(localStorage.getItem('dataSources') || '[]')
+                  const updatedSources = [...sourceUrls, ...existingSources]
+                  localStorage.setItem('dataSources', JSON.stringify(updatedSources))
+                  console.log(`💾 Saved ${sourceUrls.length} new data sources to localStorage`)
+                } else {
+                  console.log(`⚠️ No source URLs found for ${platformResult.platform}`)
                 }
+                
+                // Also update localStorage for mention results
+                const existingMentions = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+                const updatedMentions = [mentionResult, ...existingMentions]
+                localStorage.setItem('mentionResults', JSON.stringify(updatedMentions))
                 
                 console.log(`✅ Processed ${platformResult.platform} result for topic: ${topic.topic}`)
               }
@@ -1587,12 +1649,28 @@ export default function Dashboard() {
         // Refresh projects data to show updated results
         await loadProjectsFromDatabase()
         
-        // Also refresh the tracking data to show updated scan counts
+        // Also refresh the tracking data to show updated scan counts and positions
         const tracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
         setTrackingDataVersion(prev => prev + 1)
         
+        // Force refresh of the tracking data to show updated positions
+        // This ensures the UI updates with new position data
+        const updatedTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        console.log('🔄 Updated tracking data with new positions:', updatedTracking)
+        
         // Refresh data sources after a short delay (like full project scan does)
         setTimeout(fetchDataSources, 1000)
+        
+        // Also refresh the mention results to ensure UI updates
+        setTimeout(() => {
+          const currentMentions = JSON.parse(localStorage.getItem('mentionResults') || '[]')
+          setMentionResults(currentMentions)
+          
+          // Also refresh data sources from localStorage to ensure UI updates
+          const currentSources = JSON.parse(localStorage.getItem('dataSources') || '[]')
+          setDataSources(currentSources)
+          console.log(`🔄 Refreshed data sources from localStorage: ${currentSources.length} sources`)
+        }, 500)
         
       } else {
         const errorData = await scanResponse.json()
