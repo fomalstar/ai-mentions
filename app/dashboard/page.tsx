@@ -1488,11 +1488,112 @@ export default function Dashboard() {
       
       if (scanResponse.ok) {
         const scanData = await scanResponse.json()
-        console.log(`✅ Single topic scan completed for ${topic.topic}`)
-        toast.success(`Topic "${topic.topic}" refreshed successfully`)
+        console.log(`✅ Single topic scan completed for ${topic.topic}`, scanData)
+        
+        // Count total mentions found
+        let totalMentions = 0
+        if (scanData.results && Array.isArray(scanData.results)) {
+          for (const keywordResult of scanData.results) {
+            if (keywordResult.results && Array.isArray(keywordResult.results)) {
+              for (const platformResult of keywordResult.results) {
+                if (platformResult.brandMentioned) {
+                  totalMentions++
+                }
+              }
+            }
+          }
+        }
+        
+        toast.success(`Topic "${topic.topic}" refreshed successfully! Found ${totalMentions} mentions.`)
+        
+        // Process scan results like the full project scan does
+        if (scanData.results && Array.isArray(scanData.results) && scanData.results.length > 0) {
+          console.log(`📊 Processing ${scanData.results.length} scan results for single topic`)
+          
+          // The scanData.results is an array of keyword results, each with their own results array
+          for (const keywordResult of scanData.results) {
+            if (keywordResult.results && Array.isArray(keywordResult.results)) {
+              console.log(`🔍 Processing ${keywordResult.results.length} platform results for keyword: ${keywordResult.keyword}`)
+              
+              // Process each platform result (ChatGPT, Perplexity, Gemini)
+              for (const platformResult of keywordResult.results) {
+                if (platformResult.platform === 'error') {
+                  console.warn(`⚠️ Platform error: ${platformResult.responseText}`)
+                  continue
+                }
+                
+                // Create mention result in the same format as full project scan
+                const mentionResult = {
+                  id: `mention-${Date.now()}-${Math.random()}`,
+                  projectId,
+                  keyword: topic.keyword,
+                  topic: topic.topic,
+                  brandName: project.brandName,
+                  platform: platformResult.platform,
+                  hasMention: platformResult.brandMentioned,
+                  position: platformResult.position,
+                  confidence: platformResult.confidence,
+                  responseText: platformResult.responseText,
+                  sourceUrls: platformResult.sourceUrls || [],
+                  scanDuration: platformResult.scanDuration,
+                  detectedAt: new Date().toISOString()
+                }
+                
+                // Add to mention results
+                setMentionResults(prev => [mentionResult, ...prev])
+                
+                // Update localStorage with new mention data
+                const existingTracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+                const updatedTracking = existingTracking.map((item: any) => {
+                  if (item.projectId === projectId && item.keyword === topic.keyword && item.topic === topic.topic) {
+                    return {
+                      ...item,
+                      lastChecked: new Date().toISOString(),
+                      scanCount: (item.scanCount || 0) + 1
+                    }
+                  }
+                  return item
+                })
+                localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
+                
+                // Process source URLs if available
+                if (platformResult.sourceUrls && Array.isArray(platformResult.sourceUrls)) {
+                  const sourceUrls = platformResult.sourceUrls.map((urlData: any) => ({
+                    id: `source-${Date.now()}-${Math.random()}`,
+                    url: urlData.url,
+                    domain: urlData.domain,
+                    title: urlData.title,
+                    date: urlData.date || new Date().toISOString(),
+                    keyword: topic.keyword,
+                    platform: platformResult.platform,
+                    brandMentioned: platformResult.brandMentioned
+                  }))
+                  
+                  // Add to data sources
+                  setDataSources(prev => [...sourceUrls, ...prev])
+                }
+                
+                console.log(`✅ Processed ${platformResult.platform} result for topic: ${topic.topic}`)
+              }
+            }
+          }
+          
+          console.log(`✅ Updated mention results and localStorage for topic: ${topic.topic}`)
+        } else {
+          console.log(`ℹ️ No scan results returned for topic: ${topic.topic}`)
+          toast.info(`Topic "${topic.topic}" scanned but no results returned`)
+        }
         
         // Refresh projects data to show updated results
         await loadProjectsFromDatabase()
+        
+        // Also refresh the tracking data to show updated scan counts
+        const tracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
+        setTrackingDataVersion(prev => prev + 1)
+        
+        // Refresh data sources after a short delay (like full project scan does)
+        setTimeout(fetchDataSources, 1000)
+        
       } else {
         const errorData = await scanResponse.json()
         console.error(`❌ Single topic scan failed:`, errorData)
