@@ -622,31 +622,55 @@ export default function Dashboard() {
     }
   }
 
-  // Enable/disable automated scanning for all topics in a project
-  const toggleProjectAutomation = async (projectId: string, enabled: boolean) => {
+  // Enable 24-hour automation for all topics in a project (one-time setup)
+  const enableAutomationForProject = async (projectId: string) => {
     try {
       const response = await fetch('/api/mentions/automation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: enabled ? 'enable' : 'disable',
+          action: 'enable',
           brandTrackingId: projectId
         })
       })
 
       if (response.ok) {
         const data = await response.json()
-        toast.success(data.message)
+        toast.success('24-hour automation enabled for all topics in this project! They will be scanned automatically every 24 hours.')
         
         // Refresh projects data to show updated automation status
         await loadProjectsFromDatabase()
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Failed to update automation settings')
+        toast.error(error.error || 'Failed to enable automation')
       }
     } catch (error) {
-      console.error('Toggle project automation error:', error)
-      toast.error('Failed to update automation settings')
+      console.error('Enable project automation error:', error)
+      toast.error('Failed to enable automation')
+    }
+  }
+
+  // Enable 24-hour automation for all projects (one-time setup)
+  const enableAutomationForAllProjects = async () => {
+    try {
+      // Check if any project already has automation enabled
+      if (projects.some(p => p.autoScanEnabled)) {
+        toast.info('24-hour automation is already enabled for some projects')
+        return
+      }
+
+      // Enable automation for each project
+      for (const project of projects) {
+        await enableAutomationForProject(project.id)
+      }
+
+      toast.success('24-hour automation enabled for all projects! All topics will be scanned automatically every 24 hours.')
+      
+      // Refresh projects data to show updated automation status
+      await loadProjectsFromDatabase()
+    } catch (error) {
+      console.error('Enable all projects automation error:', error)
+      toast.error('Failed to enable automation for all projects')
     }
   }
 
@@ -833,7 +857,7 @@ export default function Dashboard() {
           const data = await response.json()
           
           if (data.brandTracking && Array.isArray(data.brandTracking)) {
-          // Convert database projects to Project format
+            // Convert database projects to Project format
           const dbProjects: Project[] = data.brandTracking.map((tracking: any) => ({
             id: tracking.id,
             name: tracking.displayName,
@@ -1504,36 +1528,55 @@ export default function Dashboard() {
     }
   }
 
-  // Enable/disable automated scanning for a single topic
-  const toggleTopicAutomation = async (projectId: string, topic: any, enabled: boolean) => {
+  // Enable 24-hour automation for a single topic (one-time setup)
+  const enableAutomationForTopic = async (projectId: string, topic: any) => {
     try {
+      // Check if automation is already enabled
+      if (topic.autoScanEnabled) {
+        toast.info('24-hour automation is already enabled for this topic')
+        return
+      }
+
       const response = await fetch('/api/mentions/automation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: enabled ? 'enable' : 'disable',
+          action: 'enable',
           keywordTrackingId: topic.id
         })
       })
 
       if (response.ok) {
         const data = await response.json()
-        toast.success(data.message)
+        toast.success('24-hour automation enabled for this topic! It will be scanned automatically every 24 hours.')
         
         // Refresh projects data to show updated automation status
         await loadProjectsFromDatabase()
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Failed to update automation settings')
+        toast.error(error.error || 'Failed to enable automation')
       }
     } catch (error) {
-      console.error('Toggle automation error:', error)
-      toast.error('Failed to update automation settings')
+      console.error('Enable automation error:', error)
+      toast.error('Failed to enable automation')
     }
   }
 
-  // Refresh a single topic by scanning it
+  // Refresh a single topic by scanning it (with 24-hour limit)
   const refreshSingleTopic = async (projectId: string, topic: any) => {
+    // Check if enough time has passed since last scan (24 hours)
+    if (topic.lastChecked) {
+      const lastScanTime = new Date(topic.lastChecked).getTime()
+      const currentTime = Date.now()
+      const timeSinceLastScan = currentTime - lastScanTime
+      const hoursSinceLastScan = timeSinceLastScan / (1000 * 60 * 60)
+      
+      if (hoursSinceLastScan < 24) {
+        const remainingHours = Math.ceil(24 - hoursSinceLastScan)
+        toast.info(`Topic can only be refreshed once per day. Please wait ${remainingHours} more hours.`)
+        return
+      }
+    }
     try {
       const topicKey = `${projectId}-${topic.keyword}-${topic.topic}`
       setRefreshingTopics(prev => new Set(prev).add(topicKey))
@@ -2529,20 +2572,24 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
-                    {/* Automation toggle for all projects */}
+                    {/* Enable 24-hour automation for all projects */}
                     <Button 
                       size="sm"
                       variant="outline"
-                      onClick={() => toggleProjectAutomation('all', !projects.some(p => p.autoScanEnabled))}
+                      onClick={() => enableAutomationForAllProjects()}
+                      disabled={projects.some(p => p.autoScanEnabled)}
                       className={`${
                         projects.some(p => p.autoScanEnabled) 
-                          ? 'border-green-600 text-green-600 hover:bg-green-50' 
-                          : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                          ? 'border-green-600 text-green-600 bg-green-50 cursor-not-allowed' 
+                          : 'border-blue-600 text-blue-600 hover:bg-blue-50'
                       }`}
-                      title={projects.some(p => p.autoScanEnabled) ? '24-hour automation enabled (click to disable)' : 'Click to enable 24-hour automated scanning for all projects'}
+                      title={projects.some(p => p.autoScanEnabled) 
+                        ? '24-hour automation already enabled for all projects' 
+                        : 'Click once to enable 24-hour automated scanning for all projects'
+                      }
                     >
-                      <Zap className={`w-4 h-4 mr-2 ${projects.some(p => p.autoScanEnabled) ? 'text-green-600' : ''}`} />
-                      {projects.some(p => p.autoScanEnabled) ? 'Auto ON' : 'Auto OFF'}
+                      <Zap className="w-4 h-4 mr-2" />
+                      {projects.some(p => p.autoScanEnabled) ? 'Auto Enabled' : 'Enable Auto'}
                     </Button>
                     
                     <Button 
@@ -2772,19 +2819,23 @@ export default function Dashboard() {
                                                 <Badge variant="outline" className="text-xs">
                                                   {hasMentions ? `${analytics.totalMentions} mentions` : 'Monitoring'}
                                                 </Badge>
-                                                {/* Automation toggle button for single topic */}
+                                                {/* Enable 24-hour automation for single topic */}
                                                 <Button 
-                                                  variant={topic.autoScanEnabled ? "default" : "ghost"}
+                                                  variant="ghost"
                                                   size="sm"
-                                                  onClick={() => toggleTopicAutomation(projectId, topic, !topic.autoScanEnabled)}
+                                                  onClick={() => enableAutomationForTopic(projectId, topic)}
+                                                  disabled={topic.autoScanEnabled}
                                                   className={`${
                                                     topic.autoScanEnabled 
-                                                      ? 'bg-green-600 hover:bg-green-700 text-white' 
-                                                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                                      ? 'text-green-600 bg-green-50 cursor-not-allowed' 
+                                                      : 'text-blue-600 hover:bg-blue-50'
                                                   }`}
-                                                  title={topic.autoScanEnabled ? 'Automated scanning enabled (click to disable)' : 'Click to enable 24-hour automated scanning'}
+                                                  title={topic.autoScanEnabled 
+                                                    ? '24-hour automation already enabled for this topic' 
+                                                    : 'Click once to enable 24-hour automated scanning for this topic'
+                                                  }
                                                 >
-                                                  <Zap className={`w-4 h-4 ${topic.autoScanEnabled ? 'text-yellow-300' : ''}`} />
+                                                  <Zap className="w-4 h-4" />
                                                 </Button>
                                                 
                                                 {/* Refresh button for single topic scan */}
@@ -2792,9 +2843,20 @@ export default function Dashboard() {
                                                   variant="ghost" 
                                                   size="sm"
                                                   onClick={() => refreshSingleTopic(projectId, topic)}
-                                                  disabled={refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`)}
-                                                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                                                  title="Manual refresh (scan now)"
+                                                  disabled={
+                                                    refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ||
+                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
+                                                  }
+                                                  className={`${
+                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
+                                                      ? 'text-gray-400 cursor-not-allowed' 
+                                                      : 'text-blue-500 hover:text-blue-700 hover:bg-blue-50'
+                                                  } disabled:opacity-50`}
+                                                  title={
+                                                    (topic.lastChecked && (Date.now() - new Date(topic.lastChecked).getTime()) < 24 * 60 * 60 * 1000)
+                                                      ? 'Topic can only be refreshed once per day'
+                                                      : 'Manual refresh (scan now)'
+                                                  }
                                                 >
                                                   <RefreshCw className={`w-4 h-4 ${refreshingTopics.has(`${projectId}-${topic.keyword}-${topic.topic}`) ? 'animate-spin' : ''}`} />
                                                 </Button>
