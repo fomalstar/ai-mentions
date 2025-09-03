@@ -187,6 +187,12 @@ model BrandTracking {
   lastScanAt      DateTime?
   nextScanAt      DateTime?
   scanInterval    Int      @default(24) // Hours between scans
+  
+  // Automation settings
+  autoScanEnabled Boolean  @default(false) // Enable 24-hour automated scanning
+  autoScanStartedAt DateTime? // When automation was first enabled
+  autoScanLastRun DateTime? // Last automated scan run
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -223,6 +229,12 @@ model KeywordTracking {
   // Scanning metadata
   lastScanAt      DateTime?
   scanCount       Int      @default(0)
+  
+  // Automation settings
+  autoScanEnabled Boolean  @default(false) // Enable 24-hour automated scanning for this topic
+  autoScanStartedAt DateTime? // When automation was first enabled
+  autoScanLastRun DateTime? // Last automated scan run
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

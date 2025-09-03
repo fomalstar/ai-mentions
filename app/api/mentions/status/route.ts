@@ -57,7 +57,11 @@ export async function GET(request: NextRequest) {
               geminiPosition: true,
               positionChange: true,
               lastScanAt: true,
-              scanCount: true
+              scanCount: true,
+              // Automation fields
+              autoScanEnabled: true,
+              autoScanStartedAt: true,
+              autoScanLastRun: true
             }
           },
           _count: {
@@ -146,26 +150,30 @@ export async function GET(request: NextRequest) {
       console.warn('Brand tracking query failed, trying without scan results count:', brandsError instanceof Error ? brandsError.message : 'Unknown error')
       
       // Fallback: get brands without scan results count if scan_result table doesn't exist
-      brands = await prisma.brandTracking.findMany({
-        where,
-        include: {
-          keywordTracking: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              keyword: true,
-              topic: true,
-              avgPosition: true,
-              chatgptPosition: true,
-              perplexityPosition: true,
-              geminiPosition: true,
-              positionChange: true,
-              lastScanAt: true,
-              scanCount: true
+              brands = await prisma.brandTracking.findMany({
+          where,
+          include: {
+            keywordTracking: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                keyword: true,
+                topic: true,
+                avgPosition: true,
+                chatgptPosition: true,
+                perplexityPosition: true,
+                geminiPosition: true,
+                positionChange: true,
+                lastScanAt: true,
+                scanCount: true,
+                // Automation fields
+                autoScanEnabled: true,
+                autoScanStartedAt: true,
+                autoScanLastRun: true
+              }
             }
           }
-        }
-      })
+        })
       
       // Add empty scan count for each brand
       brands = brands.map(brand => ({
