@@ -89,12 +89,6 @@ interface Project {
   keywordsTracked: number
   mentionsFound: number
   lastActivity: string
-  
-  // Automation fields
-  autoScanEnabled?: boolean
-  autoScanStartedAt?: string
-  autoScanLastRun?: string
-  nextScanAt?: string
 }
 
 interface DashboardStats {
@@ -622,31 +616,7 @@ export default function Dashboard() {
     }
   }
 
-  // Simple click once per day function for all projects
-  const handleAllProjectsClick = async () => {
-    try {
-      // Check if projects were already clicked today
-      const today = new Date().toISOString().split('T')[0]
-      const lastClicked = localStorage.getItem('allProjectsLastClicked') || null
-      
-      if (lastClicked && lastClicked.startsWith(today)) {
-        toast.info('All projects have already been scanned today. Come back tomorrow!')
-        return
-      }
 
-      // Mark as clicked today
-      localStorage.setItem('allProjectsLastClicked', today)
-      
-      // Run the full scan
-      await startFullScanAllProjects()
-      
-      toast.success('All projects scanned successfully! You can scan all projects again tomorrow.')
-      
-    } catch (error) {
-      console.error('All projects click error:', error)
-      toast.error('Failed to scan all projects')
-    }
-  }
 
   const startFullScanAllProjects = async () => {
     try {
@@ -844,11 +814,7 @@ export default function Dashboard() {
             mentionsFound: tracking.totalMentions || 0,
             lastActivity: tracking.updatedAt ? new Date(tracking.updatedAt).toISOString() : new Date().toISOString(),
             
-            // Automation fields (temporarily disabled)
-            autoScanEnabled: false,
-            autoScanStartedAt: undefined,
-            autoScanLastRun: undefined,
-            nextScanAt: undefined
+
           }))
           
           console.log(`✅ Loaded ${dbProjects.length} projects from database`)
@@ -879,10 +845,7 @@ export default function Dashboard() {
                   geminiPosition: kw.geminiPosition,
                   positionChange: kw.positionChange,
                   scanCount: kw.scanCount,
-                  // Automation fields (temporarily disabled)
-                  autoScanEnabled: false,
-                  autoScanStartedAt: null,
-                  autoScanLastRun: null
+
                 })
               })
             }
@@ -1502,38 +1465,7 @@ export default function Dashboard() {
     }
   }
 
-  // Simple click once per day function for topics
-  const handleTopicClick = async (projectId: string, topic: any) => {
-    try {
-      // Check if topic was already clicked today
-      const today = new Date().toISOString().split('T')[0]
-      const lastClicked = topic.lastClicked || null
-      
-      if (lastClicked && lastClicked.startsWith(today)) {
-        toast.info('This topic has already been clicked today. Come back tomorrow!')
-        return
-      }
 
-      // Mark topic as clicked today
-      const updatedTopic = { ...topic, lastClicked: today }
-      
-      // Update localStorage
-      const tracking = JSON.parse(localStorage.getItem('mentionTracking') || '[]')
-      const updatedTracking = tracking.map((item: any) => 
-        item.id === topic.id ? updatedTopic : item
-      )
-      localStorage.setItem('mentionTracking', JSON.stringify(updatedTracking))
-      
-      // Run the topic scan
-      await refreshSingleTopic(projectId, updatedTopic)
-      
-      toast.success('Topic scanned successfully! You can click this topic again tomorrow.')
-      
-    } catch (error) {
-      console.error('Topic click error:', error)
-      toast.error('Failed to process topic click')
-    }
-  }
 
   // Refresh a single topic by scanning it
   const refreshSingleTopic = async (projectId: string, topic: any) => {
@@ -2532,17 +2464,7 @@ export default function Dashboard() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Keyword
                     </Button>
-                    {/* Scan all projects once per day */}
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAllProjectsClick()}
-                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                      title="Click once per day to scan all projects"
-                    >
-                      <Zap className="w-4 h-4 mr-2" />
-                      Scan All Daily
-                    </Button>
+
                     
                     <Button 
                       size="sm"
@@ -2771,16 +2693,7 @@ export default function Dashboard() {
                                                 <Badge variant="outline" className="text-xs">
                                                   {hasMentions ? `${analytics.totalMentions} mentions` : 'Monitoring'}
                                                 </Badge>
-                                                {/* Click once per day for topic */}
-                                                <Button 
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleTopicClick(projectId, topic)}
-                                                  className="text-blue-600 hover:bg-blue-50"
-                                                  title="Click once per day to scan this topic"
-                                                >
-                                                  <Zap className="w-4 h-4" />
-                                                </Button>
+
                                                 
                                                 {/* Refresh button for single topic scan */}
                                                 <Button 
