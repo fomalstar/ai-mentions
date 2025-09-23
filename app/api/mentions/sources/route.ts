@@ -34,12 +34,16 @@ export async function GET(request: NextRequest) {
     const brandTrackingId = searchParams.get('brandTrackingId')
     const keywordTrackingId = searchParams.get('keywordTrackingId')
     const platform = searchParams.get('platform')
+    const includeAll = (searchParams.get('includeAll') || 'false').toLowerCase() === 'true'
     const limit = parseInt(searchParams.get('limit') || '50')
 
     // Build where clause
     const where: any = { 
-      userId: dbUser.id,
-      brandMentioned: true // Only get results where brand was mentioned
+      userId: dbUser.id
+    }
+    if (!includeAll) {
+      // Default behavior: only show sources when brand was mentioned
+      where.brandMentioned = true
     }
     
     if (brandTrackingId) {
@@ -178,7 +182,8 @@ export async function GET(request: NextRequest) {
         brandTrackingId,
         keywordTrackingId,
         platform,
-        limit
+        limit,
+        includeAll
       }
     })
 

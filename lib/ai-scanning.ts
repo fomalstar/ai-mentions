@@ -104,7 +104,7 @@ export class AIScanningService {
           messages: [
             {
               role: 'user',
-              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand. If the topic implies rankings or comparisons, include a 'Top 10' as a numbered list (1-10) of the most relevant entities (e.g., search engines, brands, tools) so positions are explicit.`
             }
           ]
         })
@@ -207,7 +207,7 @@ export class AIScanningService {
           messages: [
             {
               role: 'user',
-              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+              content: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand. If the topic implies rankings or comparisons, include a 'Top 10' as a numbered list (1-10) of the most relevant entities (e.g., search engines, brands, tools) so positions are explicit.`
             }
           ],
           max_completion_tokens: 2000,  // Use max_completion_tokens instead of max_tokens
@@ -301,7 +301,7 @@ export class AIScanningService {
             {
               parts: [
                 {
-                  text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+                  text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand. If the topic implies rankings or comparisons, include a 'Top 10' as a numbered list (1-10) of the most relevant entities (e.g., search engines, brands, tools) so positions are explicit.`
                 }
               ]
             }
@@ -327,7 +327,7 @@ export class AIScanningService {
               {
                 parts: [
                   {
-                    text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand.`
+                    text: `Research and analyze the topic "${request.topic}". Provide a comprehensive, factual response with current information, trends, and insights. Focus on the topic itself, not any specific company or brand. If the topic implies rankings or comparisons, include a 'Top 10' as a numbered list (1-10) of the most relevant entities (e.g., search engines, brands, tools) so positions are explicit.`
                   }
                 ]
               }
