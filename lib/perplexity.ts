@@ -137,18 +137,21 @@ Focus on REAL questions that people actually ask AI models, not generic SEO keyw
   }
 
   async getRelatedKeywords(keyword: string): Promise<string[]> {
-    const prompt = `You are an expert keyword researcher. Generate 10 semantically related keywords for "${keyword}" that are:
+    const prompt = `You are an expert keyword researcher and SEO specialist. Generate 10 semantically related keywords for "${keyword}" that are:
 
-1. **Directly related** - not long-tail variations, but core concepts in the same domain
-2. **High-value** - keywords that businesses would actually target
-3. **Semantically similar** - related in meaning, not just word combinations
+**Requirements:**
+1. **Directly Related** - Core concepts in the same domain, not long-tail variations
+2. **High-Value** - Keywords that businesses would actually target for SEO/marketing
+3. **Semantically Similar** - Related in meaning and intent, not just word combinations
+4. **Market-Relevant** - Focus on terms that have commercial value and search volume
+5. **Current Trends** - Include emerging concepts and modern terminology
 
-For example:
-- If keyword is "saas" → return: business, marketing, sales, software, technology, startup, enterprise, cloud, platform, solution
-- If keyword is "project management" → return: productivity, collaboration, workflow, planning, organization, efficiency, teamwork, leadership, strategy, operations
-- If keyword is "AI tools" → return: artificial intelligence, machine learning, automation, technology, software, innovation, digital, smart, intelligent, data
+**Examples:**
+- If keyword is "saas" → return: business software, cloud platform, enterprise solution, subscription service, software-as-a-service, business automation, digital transformation, cloud computing, business tools, software platform
+- If keyword is "project management" → return: team collaboration, workflow automation, productivity tools, business planning, task management, team leadership, project planning, business operations, efficiency tools, strategic planning
+- If keyword is "AI tools" → return: artificial intelligence, machine learning, automation software, intelligent systems, AI platform, smart technology, digital intelligence, automated tools, cognitive computing, intelligent automation
 
-Return ONLY a JSON array of keywords, no explanations:
+**Format:** Return ONLY a JSON array of keywords, no explanations:
 ["keyword1", "keyword2", "keyword3", ...]`
 
     try {
@@ -261,7 +264,7 @@ Keep the response concise, factual, and immediately actionable for business prof
               content: prompt
             }
           ],
-          max_tokens: 500,
+          max_tokens: 800,
           temperature: 0.3
         })
       })

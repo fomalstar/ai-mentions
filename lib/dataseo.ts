@@ -112,23 +112,22 @@ export class DataForSEOClient {
         },
         body: JSON.stringify([{
           system_message: "You are an expert AI business analyst and market intelligence specialist. Your role is to provide comprehensive, accurate, and actionable insights about business topics, keywords, and market trends. Focus on delivering valuable information that helps businesses make informed decisions. Always provide factual, up-to-date information and mention relevant companies, brands, and market players when appropriate.",
-          user_prompt: `Analyze the keyword "${keyword}" comprehensively and provide:
+          user_prompt: `Analyze the keyword "${keyword}" for AI query optimization and brand mention opportunities:
 
-**Required Analysis:**
-1. **Market Overview** - Current state and size of this market/industry
-2. **Key Players** - Major companies, brands, and competitors in this space
-3. **Trends & Insights** - Current market trends and emerging opportunities
-4. **Business Applications** - How businesses can leverage this keyword/topic
-5. **Search Behavior** - What people are looking for and why
-6. **Actionable Insights** - Specific recommendations for businesses
+**AI Query Analysis:**
+1. **Popular AI Questions** - What do people actually ask AI about this topic?
+2. **Brand Mention Opportunities** - Where can companies naturally insert their brand?
+3. **Market Players** - Key companies and competitors in this space
+4. **Search Intent** - Commercial, informational, or navigational queries
+5. **Content Gaps** - What questions lack comprehensive answers?
 
 **Focus on:**
-- Business and marketing applications
-- Technology trends and innovations
-- Market demand and growth potential
-- Practical use cases and implementation strategies
+- Real AI query patterns (not traditional SEO)
+- Natural brand mention opportunities
+- Business applications and use cases
+- Competitive positioning insights
 
-Provide comprehensive, business-focused information that would be valuable for marketing professionals, business owners, and strategic planners.`,
+Provide concise, actionable insights for AI content strategy and brand positioning.`,
           model_name: "gpt-4.1-mini",
           max_output_tokens: 1000,
           temperature: 0.3,

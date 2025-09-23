@@ -211,7 +211,7 @@ export class AIScanningService {
             }
           ],
           max_completion_tokens: 2000,  // Use max_completion_tokens instead of max_tokens
-          temperature: 0.7
+          temperature: 0.3
         })
       })
 
@@ -308,7 +308,7 @@ export class AIScanningService {
           ],
           generationConfig: {
             maxOutputTokens: 2000,
-            temperature: 0.7
+            temperature: 0.3
           }
         })
       });
@@ -334,7 +334,7 @@ export class AIScanningService {
             ],
             generationConfig: {
               maxOutputTokens: 2000,
-              temperature: 0.7
+              temperature: 0.3
             }
           })
         })
