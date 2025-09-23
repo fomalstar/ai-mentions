@@ -3153,7 +3153,7 @@ export default function Dashboard() {
       <div className="flex h-screen">
         {/* Sidebar */}
         <div className="w-64 bg-card/50 backdrop-blur-sm border-r border-border">
-          <div className="p-4">
+          <div className="h-full p-4 flex flex-col">
             {/* App Logo/Title */}
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border/50">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -3164,7 +3164,7 @@ export default function Dashboard() {
               </h1>
             </div>
             
-            <nav className="space-y-2">
+            <nav className="space-y-2 flex-1">
               {/* Main Navigation */}
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -3298,8 +3298,8 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Account */}
-              <div className="space-y-1">
+              {/* Account (stick to bottom) */}
+              <div className="space-y-1 mt-auto pt-2">
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Account
                 </div>
