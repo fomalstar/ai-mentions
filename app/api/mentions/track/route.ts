@@ -287,7 +287,7 @@ export async function DELETE(request: NextRequest) {
         if (!keywordRecord) {
           console.log(`🔍 Partial match failed, trying case-insensitive exact matching with raw SQL...`)
           const rawResults = await prisma.$queryRaw`
-            SELECT * FROM "KeywordTracking" 
+            SELECT * FROM keyword_tracking 
             WHERE LOWER(keyword) = LOWER(${decodedKeyword}) 
             AND LOWER(topic) = LOWER(${decodedTopic})
             AND "userId" = ${dbUser.id}
