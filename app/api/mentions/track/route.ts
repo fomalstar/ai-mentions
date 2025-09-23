@@ -252,7 +252,8 @@ export async function DELETE(request: NextRequest) {
       
       try {
         // Find the keyword-topic combination by text and user ID
-        const keywordRecord = await prisma.keywordTracking.findFirst({
+        // Try multiple matching strategies for robustness
+        let keywordRecord = await prisma.keywordTracking.findFirst({
           where: {
             keyword: decodedKeyword.toLowerCase(),
             topic: decodedTopic.toLowerCase(),
@@ -263,13 +264,45 @@ export async function DELETE(request: NextRequest) {
           }
         })
 
+        // If exact match fails, try case-insensitive partial matching
+        if (!keywordRecord) {
+          console.log(`🔍 Exact match failed, trying case-insensitive partial matching...`)
+          keywordRecord = await prisma.keywordTracking.findFirst({
+            where: {
+              keyword: {
+                contains: decodedKeyword.toLowerCase()
+              },
+              topic: {
+                contains: decodedTopic.toLowerCase()
+              },
+              userId: dbUser.id
+            },
+            include: {
+              brandTracking: true
+            }
+          })
+        }
+
         if (!keywordRecord) {
           console.log(`❌ Keyword-topic combination not found: ${decodedKeyword} - ${decodedTopic} for user: ${dbUser.id}`)
-          console.log(`🔍 Available keywords for user:`, await prisma.keywordTracking.findMany({
+          
+          // Get all keywords for debugging
+          const allKeywords = await prisma.keywordTracking.findMany({
             where: { userId: dbUser.id },
             select: { id: true, keyword: true, topic: true, brandTrackingId: true }
-          }))
-          return NextResponse.json({ error: 'Keyword-topic combination not found or access denied' }, { status: 404 })
+          })
+          
+          console.log(`🔍 Available keywords for user:`, allKeywords)
+          console.log(`🔍 Search was for: keyword="${decodedKeyword.toLowerCase()}", topic="${decodedTopic.toLowerCase()}"`)
+          
+          return NextResponse.json({ 
+            error: 'Keyword-topic combination not found or access denied',
+            debug: {
+              searchedKeyword: decodedKeyword.toLowerCase(),
+              searchedTopic: decodedTopic.toLowerCase(),
+              availableKeywords: allKeywords.map(k => ({ keyword: k.keyword, topic: k.topic }))
+            }
+          }, { status: 404 })
         }
 
         // Delete the keyword-topic combination using the found record's ID
