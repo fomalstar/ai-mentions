@@ -283,6 +283,29 @@ export async function DELETE(request: NextRequest) {
           })
         }
 
+        // If still no match, try case-insensitive exact matching using raw SQL
+        if (!keywordRecord) {
+          console.log(`🔍 Partial match failed, trying case-insensitive exact matching with raw SQL...`)
+          const rawResults = await prisma.$queryRaw`
+            SELECT * FROM "KeywordTracking" 
+            WHERE LOWER(keyword) = LOWER(${decodedKeyword}) 
+            AND LOWER(topic) = LOWER(${decodedTopic})
+            AND "userId" = ${dbUser.id}
+            LIMIT 1
+          `
+          
+          if (rawResults && Array.isArray(rawResults) && rawResults.length > 0) {
+            const rawResult = rawResults[0] as any
+            // Get the full record with relations
+            keywordRecord = await prisma.keywordTracking.findUnique({
+              where: { id: rawResult.id },
+              include: {
+                brandTracking: true
+              }
+            })
+          }
+        }
+
         if (!keywordRecord) {
           console.log(`❌ Keyword-topic combination not found: ${decodedKeyword} - ${decodedTopic} for user: ${dbUser.id}`)
           
